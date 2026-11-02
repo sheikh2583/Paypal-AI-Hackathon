@@ -27,6 +27,8 @@ export const ownerPolicy = sqliteTable(
     tone: text("tone", { enum: ["friendly", "firm"] }).notNull(),
     businessName: text("business_name").notNull(),
     ownerName: text("owner_name").notNull(),
+    // updated_at tracks when the owner last changed policy settings
+    updatedAt: text("updated_at").notNull().default(""),
   },
 );
 
@@ -42,7 +44,7 @@ export const clients = sqliteTable(
     responsiveness: text("responsiveness", { enum: ["high", "medium", "low"] }).notNull(),
     notes: text("notes"),
   },
-  (table) => [uniqueIndex("clients_email_idx").on(table.email)],
+  // No UNIQUE on email: in sandbox mode all clients share PAYPAL_SANDBOX_BUYER_EMAIL (docs/03)
 );
 
 export const invoices = sqliteTable(
@@ -76,8 +78,8 @@ export const invoices = sqliteTable(
   },
   (table) => [
     index("invoices_client_id_idx").on(table.clientId),
-    index("invoices_status_idx").on(table.status),
-    index("invoices_due_at_idx").on(table.dueAt),
+    // Composite index matching docs/03: (status, due_at) for the main query path
+    index("invoices_status_due_at_idx").on(table.status, table.dueAt),
     index("invoices_next_followup_at_idx").on(table.nextFollowupAt),
     index("invoices_parent_invoice_id_idx").on(table.parentInvoiceId),
     index("invoices_plan_id_idx").on(table.planId),
@@ -171,9 +173,12 @@ export const webhookEvents = sqliteTable(
   "webhook_events",
   {
     id: text("id").primaryKey(),
+    // "type" matches docs/03; stored as event_type in DB column for clarity
     eventType: text("event_type").notNull(),
     payloadJson: text("payload_json").notNull(),
     receivedAt: text("received_at").notNull(),
+    // processed_at is set when the webhook handler finishes (null = pending/failed)
+    processedAt: text("processed_at"),
   },
   (table) => [index("webhook_events_received_at_idx").on(table.receivedAt)],
 );

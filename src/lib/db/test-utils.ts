@@ -8,10 +8,11 @@ export function createTestDb(): AppDb {
       id text PRIMARY KEY, min_deposit_percent integer NOT NULL, max_installments integer NOT NULL,
       max_plan_days integer NOT NULL, max_discount_percent integer NOT NULL,
       auto_approve_below_cents integer NOT NULL, tone text NOT NULL,
-      business_name text NOT NULL, owner_name text NOT NULL
+      business_name text NOT NULL, owner_name text NOT NULL,
+      updated_at text NOT NULL DEFAULT ''
     );
     CREATE TABLE clients (
-      id text PRIMARY KEY, name text NOT NULL, email text NOT NULL UNIQUE, persona text,
+      id text PRIMARY KEY, name text NOT NULL, email text NOT NULL, persona text,
       late_count integer NOT NULL DEFAULT 0, avg_days_late real NOT NULL DEFAULT 0,
       responsiveness text NOT NULL, notes text
     );
@@ -45,7 +46,8 @@ export function createTestDb(): AppDb {
       invoice_id text, input_json text NOT NULL, result_json text NOT NULL, ok integer NOT NULL
     );
     CREATE TABLE webhook_events (
-      id text PRIMARY KEY, event_type text NOT NULL, payload_json text NOT NULL, received_at text NOT NULL
+      id text PRIMARY KEY, event_type text NOT NULL, payload_json text NOT NULL,
+      received_at text NOT NULL, processed_at text
     );
     CREATE TABLE mock_paypal_invoices (
       id text PRIMARY KEY, number text NOT NULL UNIQUE, amount_cents integer NOT NULL,

@@ -181,6 +181,7 @@ export function getPolicy(database: AppDb = db): OwnerPolicy | undefined {
     tone: row.tone,
     businessName: row.businessName,
     ownerName: row.ownerName,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -199,6 +200,7 @@ export function upsertPolicy(policy: OwnerPolicy, database: AppDb = db): OwnerPo
         tone: policy.tone,
         businessName: policy.businessName,
         ownerName: policy.ownerName,
+        updatedAt: policy.updatedAt,
       },
     })
     .run();

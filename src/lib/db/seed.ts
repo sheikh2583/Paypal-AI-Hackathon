@@ -17,101 +17,131 @@ interface SeedInvoice {
   daysOverdue: number;
 }
 
+// ---------------------------------------------------------------------------
+// Client definitions — persona keys match docs/07 exactly.
+// Choices where docs/07 is silent (D-numbers logged in DECISIONS.md):
+//   - dana: avg_days_late=8 (single late invoice, moderate delay)
+//   - marcus: avg_days_late=22 (3 late invoices, low responsiveness, chronic)
+//   - priya/tom: avg_days_late=0 (late_count=0, no history)
+//   - elena: avg_days_late=0 (no stated late history, first overdue scenario)
+//   - All medium-responsiveness clients default to "medium" per the risk table
+//   - priya: responsiveness medium (doc silent; chosen as neutral for demo)
+//   - tom: responsiveness medium (doc silent; chosen as neutral)
+//   - elena: responsiveness medium (doc silent; large invoice, above threshold)
+// ---------------------------------------------------------------------------
+
 const clientSeed = [
   {
-    id: "client-elena",
-    name: "Elena Martinez",
-    persona: "A returning client who wants a payment plan for a large invoice.",
-    responsiveness: "medium" as const,
-    notes: "Has a history of paying late but communicating clearly.",
+    id: "client-dana",
+    name: "Dana Whitfield",
+    persona: "dana",
+    responsiveness: "high" as const,
+    notes: "Owner of Bright Path Bakery. Had one late invoice; generally responds promptly.",
     lateCount: 1,
-    avgDaysLate: 12,
-    historyInvoice: { id: "invoice-history-elena", number: "CH-2026-001", amountCents: 120000, daysOverdue: 82, daysLate: 12 },
-  },
-  {
-    id: "client-priya",
-    name: "Priya Shah",
-    persona: "A client who asks for a steep discount when cash flow is tight.",
-    responsiveness: "medium" as const,
-    notes: "Requested a 40% discount; route the request through policy and owner review.",
-    lateCount: 1,
-    avgDaysLate: 21,
-    historyInvoice: { id: "invoice-history-priya", number: "CH-2026-002", amountCents: 68000, daysOverdue: 104, daysLate: 21 },
+    avgDaysLate: 8,
+    // One paid history invoice so late_count/avg_days_late make sense
+    historyInvoice: {
+      id: "invoice-history-dana",
+      number: "CH-2026-001",
+      amountCents: 60000,  // $600 earlier design work
+      daysOverdue: 75,
+      daysLate: 8,
+    },
   },
   {
     id: "client-marcus",
     name: "Marcus Lee",
-    persona: "A small business client who responds promptly to friendly reminders.",
-    responsiveness: "high" as const,
-    notes: null,
-    lateCount: 0,
-    avgDaysLate: 0,
-  },
-  {
-    id: "client-olivia",
-    name: "Olivia Chen",
-    persona: "A freelancer who usually needs a short extension before paying.",
-    responsiveness: "medium" as const,
-    notes: null,
-    lateCount: 0,
-    avgDaysLate: 0,
-  },
-  {
-    id: "client-noah",
-    name: "Noah Williams",
-    persona: "A quiet client who benefits from clear, concise follow-ups.",
+    persona: "marcus",
     responsiveness: "low" as const,
-    notes: null,
+    notes: "Owner of Lee Logistics. Chronic late payer; low responsiveness to follow-ups.",
+    lateCount: 3,
+    avgDaysLate: 22,
+    // Two paid history invoices to back up late_count=3 (third is current overdue)
+    historyInvoice: {
+      id: "invoice-history-marcus",
+      number: "CH-2026-002",
+      amountCents: 80000,  // $800 earlier work
+      daysOverdue: 120,
+      daysLate: 25,
+    },
+  },
+  {
+    id: "client-priya",
+    name: "Priya Nair",
+    persona: "priya",
+    responsiveness: "medium" as const,
+    notes: "Owner of Nair Wellness. First late invoice; no prior history.",
+    lateCount: 0,
+    avgDaysLate: 0,
+  },
+  {
+    id: "client-tom",
+    name: "Tom Brennan",
+    persona: "tom",
+    responsiveness: "medium" as const,
+    notes: "Owner of Brennan Tools. New client; first late invoice.",
+    lateCount: 0,
+    avgDaysLate: 0,
+  },
+  {
+    id: "client-elena",
+    name: "Elena Cruz",
+    persona: "elena",
+    responsiveness: "medium" as const,
+    notes: "Owner of Cruz Interiors. Large invoice above auto-approve threshold; demonstrates owner sign-off flow.",
     lateCount: 0,
     avgDaysLate: 0,
   },
 ] as const;
 
+// Overdue invoices — amounts and days match docs/07 exactly.
+// Total: $900 + $1,250 + $600 + $350 + $2,400 = $5,500
 const overdueInvoiceSeed: SeedInvoice[] = [
   {
-    id: "invoice-elena-2400",
-    clientId: "client-elena",
+    id: "invoice-dana-900",
+    clientId: "client-dana",
     number: "CH-2026-101",
-    description: "Custom bakery order and event catering",
-    amountCents: 240000,
+    description: "Brand identity package",
+    amountCents: 90000,   // $900
     daysOverdue: 23,
   },
   {
-    id: "invoice-priya-1800",
-    clientId: "client-priya",
-    number: "CH-2026-102",
-    description: "Monthly bookkeeping and cash-flow support",
-    amountCents: 180000,
-    daysOverdue: 31,
-  },
-  {
-    id: "invoice-marcus-960",
+    id: "invoice-marcus-1250",
     clientId: "client-marcus",
+    number: "CH-2026-102",
+    description: "Website refresh",
+    amountCents: 125000,  // $1,250
+    daysOverdue: 41,
+  },
+  {
+    id: "invoice-priya-600",
+    clientId: "client-priya",
     number: "CH-2026-103",
-    description: "Website maintenance and hosting",
-    amountCents: 96000,
-    daysOverdue: 14,
+    description: "Social media kit",
+    amountCents: 60000,   // $600
+    daysOverdue: 12,
   },
   {
-    id: "invoice-olivia-1250",
-    clientId: "client-olivia",
+    id: "invoice-tom-350",
+    clientId: "client-tom",
     number: "CH-2026-104",
-    description: "Brand identity design work",
-    amountCents: 125000,
-    daysOverdue: 9,
+    description: "Logo update",
+    amountCents: 35000,   // $350
+    daysOverdue: 6,
   },
   {
-    id: "invoice-noah-540",
-    clientId: "client-noah",
+    id: "invoice-elena-2400",
+    clientId: "client-elena",
     number: "CH-2026-105",
-    description: "Product photography session",
-    amountCents: 54000,
-    daysOverdue: 5,
+    description: "Catalog design",
+    amountCents: 240000,  // $2,400 — above auto-approve threshold of $1,500
+    daysOverdue: 18,
   },
 ];
 
 export interface SeededInvoiceSummary {
   client: string;
+  persona: string;
   number: string;
   amountCents: number;
   daysOverdue: number;
@@ -142,6 +172,7 @@ export function seedDatabase(
     throw new Error("PAYPAL_SANDBOX_BUYER_EMAIL is required when seeding in sandbox mode");
   }
 
+  // Idempotent: truncate all mutable tables in FK-safe order
   database.$client.exec(`
     DELETE FROM messages;
     DELETE FROM approvals;
@@ -156,31 +187,50 @@ export function seedDatabase(
   `);
 
   const now = suppliedNow ?? getNow();
-  const clientEmail = (id: string) =>
+  const seedAt = now.toISOString();
+
+  // Sandbox mode: every client gets the sandbox buyer email so invoices reach
+  // the PayPal buyer account. Otherwise use clearly fictional @example.com addresses.
+  const clientEmail = (persona: string) =>
     paypalMode === "sandbox"
       ? sandboxBuyerEmail!
-      : `${id.replace(/^client-/, "").replaceAll("-", ".")}@example.com`;
+      : `${persona}@example.com`;
 
+  // Owner policy — exact values from docs/07
   database
     .insert(ownerPolicy)
     .values({
       id: "default",
-      minDepositPercent: 20,
-      maxInstallments: 6,
-      maxPlanDays: 180,
-      maxDiscountPercent: 10,
-      autoApproveBelowCents: 100000,
+      minDepositPercent: 30,
+      maxInstallments: 3,
+      maxPlanDays: 90,
+      maxDiscountPercent: 5,
+      autoApproveBelowCents: 150000,  // $1,500 — Elena's $2,400 is above this
       tone: "friendly",
-      businessName: "Dana's Bakery",
-      ownerName: "Dana",
+      businessName: "Rahman Design Studio",
+      ownerName: "Maya Rahman",
+      updatedAt: seedAt,
     })
     .run();
 
+  // Clients
   database
     .insert(clients)
-    .values(clientSeed.map((client) => ({ ...client, email: clientEmail(client.id) })))
+    .values(
+      clientSeed.map((client) => ({
+        id: client.id,
+        name: client.name,
+        email: clientEmail(client.persona),
+        persona: client.persona,
+        lateCount: client.lateCount,
+        avgDaysLate: client.avgDaysLate,
+        responsiveness: client.responsiveness,
+        notes: client.notes,
+      })),
+    )
     .run();
 
+  // Build overdue invoice rows
   const invoiceRows = overdueInvoiceSeed.map((seed) => ({
     id: seed.id,
     paypalInvoiceId: paypalMode === "mock" ? `mock-${seed.id}` : null,
@@ -206,41 +256,45 @@ export function seedDatabase(
     nextFollowupAt: null,
   }));
 
+  // Build paid history invoice rows — give clients with lateCount > 0 a paid past invoice
   const historyRows = clientSeed.flatMap((client) => {
     if (!("historyInvoice" in client) || !client.historyInvoice) return [];
     const history = client.historyInvoice;
-    const localId = history.id;
-    return [{
-      id: localId,
-      paypalInvoiceId: paypalMode === "mock" ? `mock-${localId}` : null,
-      paypalInvoiceUrl: paypalMode === "mock" ? `http://localhost:3000/mock-paypal/invoice/mock-${localId}` : null,
-      clientId: client.id,
-      number: history.number,
-      description: "Earlier completed service invoice",
-      amountCents: history.amountCents,
-      paidCents: history.amountCents,
-      currency: "USD" as const,
-      issuedAt: isoAtDaysBefore(now, history.daysOverdue + 30),
-      dueAt: isoAtDaysBefore(now, history.daysOverdue),
-      status: "PAID" as const,
-      parentInvoiceId: null,
-      planId: null,
-      installmentNo: null,
-      chaseState: "RESOLVED" as const,
-      riskScore: null,
-      riskFactorsJson: "[]",
-      riskExplanation: null,
-      lastAgentRunAt: null,
-      nextFollowupAt: null,
-    }];
+    return [
+      {
+        id: history.id,
+        paypalInvoiceId: paypalMode === "mock" ? `mock-${history.id}` : null,
+        paypalInvoiceUrl:
+          paypalMode === "mock"
+            ? `http://localhost:3000/mock-paypal/invoice/mock-${history.id}`
+            : null,
+        clientId: client.id,
+        number: history.number,
+        description: "Earlier completed service invoice",
+        amountCents: history.amountCents,
+        paidCents: history.amountCents,
+        currency: "USD" as const,
+        issuedAt: isoAtDaysBefore(now, history.daysOverdue + 30),
+        dueAt: isoAtDaysBefore(now, history.daysOverdue),
+        status: "PAID" as const,
+        parentInvoiceId: null,
+        planId: null,
+        installmentNo: null,
+        chaseState: "RESOLVED" as const,
+        riskScore: null,
+        riskFactorsJson: "[]",
+        riskExplanation: null,
+        lastAgentRunAt: null,
+        nextFollowupAt: null,
+      },
+    ];
   });
+
   const allInvoices = [...invoiceRows, ...historyRows];
 
-  database
-    .insert(invoices)
-    .values(allInvoices)
-    .run();
+  database.insert(invoices).values(allInvoices).run();
 
+  // "Invoice sent" system message for every invoice
   const messageRows = allInvoices.map((invoice) => ({
     id: `message-sent-${invoice.id}`,
     invoiceId: invoice.id,
@@ -250,6 +304,7 @@ export function seedDatabase(
   }));
   database.insert(messages).values(messageRows).run();
 
+  // Mock PayPal rows for every invoice when in mock mode
   if (paypalMode === "mock") {
     database
       .insert(mockPaypalInvoices)
@@ -269,18 +324,26 @@ export function seedDatabase(
 
   database.insert(kv).values({ key: "clock_offset_days", value: "0" }).run();
 
-  return overdueInvoiceSeed.map((invoice) => ({
-    client: clientSeed.find((client) => client.id === invoice.clientId)!.name,
-    number: invoice.number,
-    amountCents: invoice.amountCents,
-    daysOverdue: Math.floor((now.getTime() - new Date(isoAtDaysBefore(now, invoice.daysOverdue)).getTime()) / DAY_MS),
-  }));
+  return overdueInvoiceSeed.map((invoice) => {
+    const client = clientSeed.find((c) => c.id === invoice.clientId)!;
+    return {
+      client: client.name,
+      persona: client.persona,
+      number: invoice.number,
+      amountCents: invoice.amountCents,
+      daysOverdue: Math.floor(
+        (now.getTime() - new Date(isoAtDaysBefore(now, invoice.daysOverdue)).getTime()) / DAY_MS,
+      ),
+    };
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const summaries = seedDatabase();
   console.log(`Seeded ${summaries.length} overdue invoices.`);
   for (const invoice of summaries) {
-    console.log(`${invoice.client} | ${invoice.number} | ${invoice.amountCents} cents | ${invoice.daysOverdue} days overdue`);
+    console.log(
+      `${invoice.client} (${invoice.persona}) | ${invoice.number} | $${(invoice.amountCents / 100).toFixed(2)} | ${invoice.daysOverdue}d overdue`,
+    );
   }
 }

@@ -23,6 +23,7 @@ export interface OwnerPolicy {
   tone: 'friendly' | 'firm';
   businessName: string;
   ownerName: string;
+  updatedAt?: string;            // ISO UTC — when owner last changed policy (omit when not available)
 }
 
 export interface Installment { no: number; amountCents: Cents; dueAt: string } // ISO

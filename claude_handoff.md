@@ -62,7 +62,7 @@ pnpm paypal:smoke  # smoke test PayPal client in current PAYPAL_MODE
 
 ### ✅ What exists and works
 
-**Foundation (complete, 218 passing tests + 1 skipped):**
+**Foundation (complete, 226 passing tests + 1 skipped):**
 - Full DB schema (Drizzle + SQLite) — all 10 tables: `owner_policy`, `clients`, `invoices`, `plans`, `messages`, `approvals`, `audit_log`, `webhook_events`, `mock_paypal_invoices`, `kv`
 - Full `queries.ts` — all read/write helpers including `updateInvoice`, `insertMockPaypalInvoice`, `getMockPaypalInvoice`, `updateMockPaypalInvoice`, `listReconcilableInvoices`
 - Seed script with 5 demo clients/invoices (Elena $2,400 · Priya $1,800 · Marcus $960 · Olivia $1,250 · Noah $540 — all overdue)
@@ -84,13 +84,23 @@ pnpm paypal:smoke  # smoke test PayPal client in current PAYPAL_MODE
 - `src/app/api/mock-paypal/pay/route.ts` — mock-mode-only route (409 in real mode), Zod-validated
 - **Tests:** 32 map tests + 9 mock lifecycle/reconcile tests + 1 skipped contract test
 
+**Policy + Risk modules (complete, prompt 04):**
+- `src/lib/policy/plan.ts` — `evaluatePlan`, `suggestPlan`, `rebasePlan`, `remainingCents`, `discountedTotal`, `minDeposit`, `MIN_PLAN_REMAINING_CENTS`
+- `src/lib/policy/index.ts` — re-exports
+- `src/lib/risk/index.ts` — `computeRisk(features)`, `riskLabel(score)`, `RiskFeatures` interface
+- **Tests:** 65 policy tests + 51 risk tests
+
+**Schema + Seed aligned with docs (complete, prompt 05):**
+- `src/lib/db/schema.ts` — added `owner_policy.updated_at`, `webhook_events.processed_at`, fixed composite index `(status, due_at)`, removed incorrect UNIQUE on `clients.email`
+- `src/lib/db/seed.ts` — fully rewritten to match docs/07: Maya Rahman owner, 5 correct clients/invoices ($5,500 total), correct policy values
+- `src/lib/db/test-utils.ts` — updated to match schema
+- **Tests:** 9 seed tests (contract test verifying docs/07 table row-by-row)
+
 **Shared components:** `app-nav.tsx`, `page-header.tsx`, `empty-state.tsx`
 **Placeholder pages:** `/`, `/invoices/[id]`, `/approvals`, `/policy`, `/audit`
 
 ### 🚧 Not yet built
 
-- `src/lib/policy/` — plan evaluation logic
-- `src/lib/risk/` — risk scoring + explainer
 - `src/lib/agent/` — LLM tool-use loop, tools, prompt, classifier, scripts, next-action
 - `src/lib/llm.ts` — LLM wrapper
 - `src/lib/approvals/service.ts` — owner decision handling
@@ -171,9 +181,9 @@ src/
       queries.ts                  # ✅ complete — all read/write helpers
       seed.ts                     # ✅ demo data
       test-utils.ts               # ✅ in-memory test DB helper
-    paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}  # 🚧
-    policy/{index.ts,plan.ts}                                        # 🚧
-    risk/{index.ts,service.ts}                                       # 🚧
+    paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}  # ✅ complete
+    policy/{index.ts,plan.ts}                                        # ✅ complete (65 tests)
+    risk/{index.ts}                                                  # ✅ complete (51 tests)
     agent/{run.ts,tools.ts,prompt.ts,classify.ts,scripts.ts,next-action.ts} # 🚧
     approvals/service.ts                                             # 🚧
     sim/client.ts                                                    # 🚧
@@ -475,15 +485,26 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 
 ---
 
-## Demo Scenario (Seeded Clients)
+## Demo Scenario (Seeded Clients — docs/07)
 
-| Client | Invoice | Amount | Days Overdue | Scenario |
-|---|---|---|---|---|
-| Elena Martinez | CH-2026-101 | \$2,400 | 23 | Main story: requests plan → above auto-approve threshold → owner signs off → agent sends offer → Elena accepts → installment invoices created |
-| Priya Shah | CH-2026-102 | \$1,800 | 31 | Requests 40% discount (out of bounds) → escalates as `DISCOUNT_REQUEST` → owner counters 5% → agent relays → negotiation |
-| Marcus Lee | CH-2026-103 | \$960 | 14 | Standard nudge → accepts plan within policy |
-| Olivia Chen | CH-2026-104 | \$1,250 | 9 | Early chase → schedules follow-up |
-| Noah Williams | CH-2026-105 | \$540 | 5 | Short gentle nudge |
+Owner: **Maya Rahman**, business **Rahman Design Studio**. Policy: 30% min deposit, max 3 installments, 90 days, 5% max discount, auto-approve below \$1,500, tone friendly.
+
+| Client | Invoice | Amount | Days Overdue | Persona | Notes |
+|---|---|---|---|---|---|
+| Dana Whitfield (Bright Path Bakery) | Brand identity package | \$900 | 23 | `dana` | late_count 1, high responsiveness |
+| Marcus Lee (Lee Logistics) | Website refresh | \$1,250 | 41 | `marcus` | late_count 3, low responsiveness |
+| Priya Nair (Nair Wellness) | Social media kit | \$600 | 12 | `priya` | late_count 0, medium responsiveness |
+| Tom Brennan (Brennan Tools) | Logo update | \$350 | 6 | `tom` | late_count 0, medium responsiveness |
+| Elena Cruz (Cruz Interiors) | Catalog design | \$2,400 | 18 | `elena` | large; above auto-approve threshold |
+
+**Total overdue: \$5,500.** Dana and Marcus have paid history invoices (CH-2026-001/002) so their `late_count`/`avg_days_late` make sense.
+
+**Key demo paths:**
+- **Dana** ($900, 23d): runs the main payment-plan flow — agent offers 30% deposit ($270) + 2×$315. Auto-approved (below $1,500 threshold).
+- **Marcus** ($1,250, 41d): low responsiveness, chronic late payer — escalation / firm follow-up path.
+- **Priya** ($600, 12d): requests 40% discount → `DISCOUNT_REQUEST` escalation → owner counters with 5%.
+- **Elena** ($2,400, 18d): plan exceeds auto-approve threshold → `PLAN_NEEDS_SIGNOFF` → owner approves → agent sends offer.
+- **Tom** ($350, 6d): short gentle nudge; $350 is below `MIN_PLAN_REMAINING_CENTS` threshold if he requests a plan.
 
 ---
 
@@ -504,7 +525,7 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 
 ## Key Gotchas & Decisions
 
-- **`getNow()` not `new Date()`** — always use `src/lib/clock.ts`'s `getNow()` so time-travel demo works. Clock offset is persisted in the `kv` table (key: `clock_offset_ms`)
+- **`getNow()` not `new Date()`** — always use `src/lib/clock.ts`'s `getNow()` so time-travel demo works. Clock offset is persisted in the `kv` table (key: `clock_offset_days`; value is a number of days, converted to ms on read — D31)
 - **shadcn/ui**: configured by hand (no `shadcn init`). No components installed yet. To add: `pnpm dlx shadcn@latest add <component>` from a networked machine
 - **`db:push` "index already exists"** — known harmless warning; schema is already applied
 - **`better-sqlite3`**: ships prebuilt binaries, no `node-gyp` needed. Keep it in `serverExternalPackages` in `next.config.ts`
@@ -556,4 +577,4 @@ Cross-area changes go through `docs/04-contracts.md` contracts or coordinated PR
 
 ---
 
-*Handoff updated Nov 3 2026 (prompt 03 — PayPal integration complete). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
+*Handoff updated Nov 3 2026 (prompt 05 — schema + seed aligned with docs/03 and docs/07, 226 tests). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
