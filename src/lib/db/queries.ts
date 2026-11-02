@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, notInArray } from "drizzle-orm";
 import type {
   ApprovalKind,
   ApprovalRow,
@@ -20,6 +20,7 @@ import {
   invoices,
   kv,
   messages,
+  mockPaypalInvoices,
   ownerPolicy,
   plans,
   webhookEvents,
@@ -334,4 +335,91 @@ export function setKv(key: string, value: string, database: AppDb = db): void {
     .values({ key, value })
     .onConflictDoUpdate({ target: kv.key, set: { value } })
     .run();
+}
+
+// ---------------------------------------------------------------------------
+// Invoice updates (used by reconciler and plan handlers)
+// ---------------------------------------------------------------------------
+
+export type InvoiceUpdate = Partial<
+  Pick<InvoiceRow, "status" | "paidCents" | "paypalInvoiceId" | "paypalInvoiceUrl" | "chaseState" | "planId" | "lastAgentRunAt" | "nextFollowupAt" | "riskScore" | "riskExplanation">
+>;
+
+export function updateInvoice(id: string, update: InvoiceUpdate, database: AppDb = db): InvoiceRow | undefined {
+  const row = database.update(invoices).set(update).where(eq(invoices.id, id)).returning().all()[0];
+  return row ? mapInvoice(row) : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Mock PayPal invoice helpers (PAYPAL_MODE=mock only)
+// ---------------------------------------------------------------------------
+
+export interface MockPayPalInvoiceRow {
+  id: string;
+  number: string;
+  amountCents: number;
+  paidCents: number;
+  status: string;
+  recipientViewUrl: string;
+  createdAt: string;
+}
+
+function mapMockInvoice(row: typeof mockPaypalInvoices.$inferSelect): MockPayPalInvoiceRow {
+  return {
+    id: row.id,
+    number: row.number,
+    amountCents: row.amountCents,
+    paidCents: row.paidCents,
+    status: row.status,
+    recipientViewUrl: row.recipientViewUrl,
+    createdAt: row.createdAt,
+  };
+}
+
+export function insertMockPaypalInvoice(
+  invoice: MockPayPalInvoiceRow,
+  database: AppDb = db,
+): MockPayPalInvoiceRow {
+  database.insert(mockPaypalInvoices).values(invoice).run();
+  return invoice;
+}
+
+export function getMockPaypalInvoice(
+  id: string,
+  database: AppDb = db,
+): MockPayPalInvoiceRow | undefined {
+  const row = database
+    .select()
+    .from(mockPaypalInvoices)
+    .where(eq(mockPaypalInvoices.id, id))
+    .limit(1)
+    .all()[0];
+  return row ? mapMockInvoice(row) : undefined;
+}
+
+export type MockPayPalInvoiceUpdate = Partial<Pick<MockPayPalInvoiceRow, "status" | "paidCents">>;
+
+export function updateMockPaypalInvoice(
+  id: string,
+  update: MockPayPalInvoiceUpdate,
+  database: AppDb = db,
+): MockPayPalInvoiceRow | undefined {
+  const row = database
+    .update(mockPaypalInvoices)
+    .set(update)
+    .where(eq(mockPaypalInvoices.id, id))
+    .returning()
+    .all()[0];
+  return row ? mapMockInvoice(row) : undefined;
+}
+
+/** Returns all local invoices that have a paypal_invoice_id and are not in a terminal state. */
+export function listReconcilableInvoices(database: AppDb = db): InvoiceRow[] {
+  const terminalStatuses: InvoiceStatus[] = ["PAID", "CANCELLED", "SUPERSEDED"];
+  return database
+    .select()
+    .from(invoices)
+    .where(and(isNotNull(invoices.paypalInvoiceId), notInArray(invoices.status, terminalStatuses)))
+    .all()
+    .map(mapInvoice);
 }
