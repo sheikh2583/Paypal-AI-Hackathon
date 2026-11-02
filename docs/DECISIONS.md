@@ -119,3 +119,7 @@ Resolved before prompt 01, in response to the gap review after prompt 00. Each e
 **D45. `webhook_events.event_type` kept as-is; not renamed to `type`.** docs/03 describes the column informally as `type`. The Drizzle field is `eventType` → DB column `event_type`. Renaming requires a destructive table rebuild which `drizzle-kit push` resolves via an interactive prompt — this would hang on Render's non-TTY start command. Decision: keep `event_type` and document the deviation. The column is functionally identical; no code outside `schema.ts` and `queries.ts` touches it by name.
 
 **D46. `db:push` idempotency confirmed on existing DB.** After the prompt 05 schema additions (`updated_at`, `processed_at`), running `pnpm db:push` a second time reports "No changes detected" — fully safe for Render's start command. Column renames are the only case that would block (non-TTY interactive prompt); avoided by D45.
+
+## Agent implementation
+
+**D47. Installed Anthropic SDK typing.** The installed `@anthropic-ai/sdk` 1.3.0 exposes message and tool types through `Anthropic.Messages`; `zodOutputFormat()` is nested under `output_config.format`. This differs from the newer SDK examples, so `llm.ts` follows the installed package types. Scripted turns persist per persona and resolve invoice, plan, and date placeholders from the current run/context so offline demo actions use real seeded IDs and amounts.

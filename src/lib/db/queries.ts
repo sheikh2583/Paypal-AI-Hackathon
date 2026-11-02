@@ -143,6 +143,32 @@ export function getInvoice(id: string, database: AppDb = db): InvoiceRow | undef
   return row ? mapInvoice(row) : undefined;
 }
 
+export function getClient(id: string, database: AppDb = db): ClientRow | undefined {
+  const row = database.select().from(clients).where(eq(clients.id, id)).limit(1).all()[0];
+  return row ? mapClient(row) : undefined;
+}
+
+/** Returns all local invoice rows that share the given planId (installment siblings). */
+export function listInvoicesByPlanId(planId: string, database: AppDb = db): InvoiceRow[] {
+  return database
+    .select()
+    .from(invoices)
+    .where(eq(invoices.planId, planId))
+    .all()
+    .map(mapInvoice);
+}
+
+/** Returns all plans for a given invoice id. */
+export function listPlansByInvoiceId(invoiceId: string, database: AppDb = db): PlanRow[] {
+  return database
+    .select()
+    .from(plans)
+    .where(eq(plans.invoiceId, invoiceId))
+    .orderBy(desc(plans.createdAt))
+    .all()
+    .map(mapPlan);
+}
+
 export function getMessages(invoiceId: string, database: AppDb = db): ChatMessage[] {
   return database
     .select()
