@@ -58,11 +58,11 @@ pnpm paypal:smoke  # smoke test PayPal client in current PAYPAL_MODE
 
 ---
 
-## Current State (as of Nov 3 2026)
+## Current State (as of Nov 3 2026 — prompt 04 complete)
 
 ### ✅ What exists and works
 
-**Foundation (complete, 102 passing tests + 1 skipped):**
+**Foundation (complete, 218 passing tests + 1 skipped):**
 - Full DB schema (Drizzle + SQLite) — all 10 tables: `owner_policy`, `clients`, `invoices`, `plans`, `messages`, `approvals`, `audit_log`, `webhook_events`, `mock_paypal_invoices`, `kv`
 - Full `queries.ts` — all read/write helpers including `updateInvoice`, `insertMockPaypalInvoice`, `getMockPaypalInvoice`, `updateMockPaypalInvoice`, `listReconcilableInvoices`
 - Seed script with 5 demo clients/invoices (Elena $2,400 · Priya $1,800 · Marcus $960 · Olivia $1,250 · Noah $540 — all overdue)

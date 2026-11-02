@@ -108,3 +108,4 @@ export function riskLabel(score: number): "Low" | "Medium" | "High" {
   if (score < 65) return "Medium";
   return "High";
 }
+

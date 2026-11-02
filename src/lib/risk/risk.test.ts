@@ -331,3 +331,4 @@ describe("computeRisk — integrated scenario", () => {
     expect(riskLabel(r.score)).toBe("High");
   });
 });
+
