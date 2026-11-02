@@ -12,3 +12,4 @@ cmds = ["pnpm build"]
 
 [start]
 cmd = "mkdir -p /app/data && pnpm db:push && pnpm db:seed && pnpm start"
+
