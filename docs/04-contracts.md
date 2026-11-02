@@ -23,6 +23,7 @@ export interface OwnerPolicy {
   tone: 'friendly' | 'firm';
   businessName: string;
   ownerName: string;
+  updatedAt?: string;            // ISO UTC; metadata set by the DB layer, not a policy rule
 }
 
 export interface Installment { no: number; amountCents: Cents; dueAt: string } // ISO

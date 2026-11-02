@@ -173,7 +173,9 @@ export const webhookEvents = sqliteTable(
   "webhook_events",
   {
     id: text("id").primaryKey(),
-    // "type" matches docs/03; stored as event_type in DB column for clarity
+    // docs/03 calls this "type"; stored as "event_type" to avoid the SQL reserved word.
+    // Renaming would require a destructive table rebuild on Render (no TTY for drizzle push).
+    // D44: decision to keep event_type and document the deviation.
     eventType: text("event_type").notNull(),
     payloadJson: text("payload_json").notNull(),
     receivedAt: text("received_at").notNull(),
