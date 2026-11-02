@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "python3", "pkg-config"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm@10.28.0",
+  "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = ["pnpm build"]
+
+[start]
+cmd = "mkdir -p /app/data && pnpm db:push && pnpm db:seed && pnpm start"
