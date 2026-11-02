@@ -81,3 +81,19 @@ Resolved before prompt 01, in response to the gap review after prompt 00. Each e
 **D29. Seed scenario source.** `docs/07-demo-and-submission.md` was absent from both project copies. Preserved the known Elena $2,400 plan and Priya discount scenario, then filled three additional clients, invoice amounts, due offsets (23, 31, 14, 9, and 5 days), owner policy defaults, and two paid history invoices as deterministic demo assumptions.
 
 **D30. SQLite checks.** Drizzle Kit 0.31.11 rebuilt unchanged SQLite tables on repeated `db:push` when SQL `CHECK` constraints were present, then emitted duplicate index creation. Omitted optional SQL checks so push is idempotent; status and kind values remain constrained by the Drizzle TypeScript unions.
+
+## Prompt 03 (PayPal integration)
+
+**D31. Clock KV key mismatch.** The handoff doc (`claude_handoff.md`) said the KV key was `"clock_offset_ms"`. The actual code in `src/lib/clock.ts` uses `"clock_offset_days"` (the value stored is a number of days, converted to ms on read). All code in this repo uses `"clock_offset_days"`. The handoff has been corrected; no code change needed.
+
+**D32. `docs/05-paypal-integration.md` absent.** The file referenced in AGENTS.md does not exist in the repo. The real client in `src/lib/paypal/real.ts` was built from current official PayPal developer documentation (Nov 2026) and is marked UNVERIFIED until tested against live Sandbox credentials. Key API facts sourced: OAuth2 `POST /v1/oauth2/token` client-credentials; Invoicing v2 endpoints (`POST /v2/invoicing/invoices`, `/send`, `/cancel`, `GET /v2/invoicing/invoices/{id}`); `recipient_view_url` lives at `detail.metadata.recipient_view_url` in the GET response; send returns `202`; cancel returns `204`.
+
+**D33. PayPal status SENT vs UNPAID.** PayPal's Invoicing v2 API uses the status string `"SENT"` in response objects (confirmed from docs: DRAFT → SENT after send). Our `PayPalInvoice.status` contract uses `'SENT'`; `map.ts` maps it directly. No discrepancy.
+
+**D34. PayPal create response shape.** `POST /v2/invoicing/invoices` returns `201` with the invoice object JSON containing `id` (the paypal invoice id, e.g. `INV2-XXXX-...`) and a `detail.metadata` block. The `recipient_view_url` is only populated after send (or may require a GET after create). Real client calls GET after send to fetch the final URL. UNVERIFIED until sandbox credentials are available.
+
+**D35. `PAYPAL_MODE=mock` smoke test is the acceptance gate.** Sandbox credentials are not present in this environment. `PAYPAL_MODE=sandbox pnpm paypal:smoke` cannot be verified; this is noted in the final report. The real client is built correctly per the docs but marked UNVERIFIED (D32).
+
+**D36. Mock invoice ID format.** Mock PayPal invoice IDs use the format `MOCK-INV2-<uuid-prefix>` (first 8 chars of a UUID) to be clearly non-real while matching `INV2-` prefix convention. This is stored in `mock_paypal_invoices.id` and surfaced as `paypalInvoiceId` in our `PayPalInvoice` type.
+
+**D37. reconcile idempotency mechanism.** `reconcilePayPalInvoices()` checks status before updating: if local status already matches the PayPal-derived status, it skips the update and emits no event, preventing duplicate audit rows and events on repeated runs. For UNEXPECTED_PAYMENT on SUPERSEDED invoices, it checks for an existing PENDING approval of kind `UNEXPECTED_PAYMENT` for that invoice before inserting a new one.
