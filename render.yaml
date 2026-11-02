@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: chaser
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install -g pnpm@10.28.0 && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm db:push; pnpm db:seed; pnpm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: ./data/chaser.db
+      - key: LLM_MODE
+        value: auto
+      - key: PAYPAL_MODE
+        value: mock
+      - key: APP_BASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
