@@ -4,7 +4,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm install -g pnpm@10.28.0 && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: corepack enable && corepack prepare pnpm@10.28.0 --activate && pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm db:push; pnpm db:seed; pnpm start
     healthCheckPath: /
     envVars:
@@ -20,3 +20,4 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+
