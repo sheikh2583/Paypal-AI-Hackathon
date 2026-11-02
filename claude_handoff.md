@@ -17,6 +17,7 @@
 - Escalates anything out-of-bounds to a human approval inbox
 
 **GitHub repo:** https://github.com/sheikh2583/Paypal-AI-Hackathon  
+**Live deployment:** https://paypal-ai-hackathon-9tkr.onrender.com (Render free tier, mock PayPal mode)  
 **Hackathon deadline:** Nov 12, 2026 (Devpost)  
 **Target awards:** Best Use of Agentic Commerce · Most Impactful · Best Use of PayPal + AI · Best Demo Delivery
 
@@ -31,10 +32,11 @@
 | Database | SQLite via `better-sqlite3` 13.0.3 + Drizzle ORM 0.45.4 (file at `./data/chaser.db`) |
 | Validation | Zod 4.6.7 (v4 API — use `z.string()` not `z.string().min(1)` for nonempty etc.) |
 | Tests | Vitest 5.0.5 |
-| LLM | `@anthropic-ai/sdk` 1.3.0 tool-use loop, always behind `src/lib/llm.ts`. Model from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). `LLM_MODE=auto` = scripted when no API key, live otherwise |
+| LLM | `@anthropic-ai/sdk` 1.3.0 tool-use loop, always behind `src/lib/llm.ts`. Model from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). `LLM_MODE=auto` = scripted when no API key, live mode otherwise |
 | PayPal | Direct REST fetch from `src/lib/paypal/`. `PAYPAL_MODE=mock` = fully fake. `PAYPAL_MODE=sandbox` = real Sandbox API |
 | Package manager | `pnpm` 10.28.0 |
 | Node | 22.23.4 |
+| Deployment | Render (free tier). Config in `render.yaml`. Build: `npx pnpm install && pnpm build`. Start: `pnpm db:push; pnpm db:seed; pnpm start` |
 
 ---
 
@@ -49,6 +51,7 @@ pnpm test          # vitest run (includes scripted evals)
 pnpm test:evals    # eval CLI; add --live for real LLM
 pnpm db:push       # apply schema (idempotent; ignore "index already exists" warning)
 pnpm db:seed       # reset + reseed demo data
+pnpm paypal:smoke  # smoke test PayPal client in current PAYPAL_MODE
 ```
 
 **Before declaring any task done:** `pnpm typecheck && pnpm lint && pnpm test` must all pass.
@@ -58,22 +61,34 @@ pnpm db:seed       # reset + reseed demo data
 ## Current State (as of Nov 3 2026)
 
 ### ✅ What exists and works
-- Full DB schema (Drizzle + SQLite) with all tables: `clients`, `invoices`, `plans`, `installments`, `audit_log`, `approvals`, `chat_messages`, `config`
-- Seed script with 5 demo clients/invoices (Elena $2,400 · Priya $1,800 · Marcus $960 · Olivia $1,250 · Noah $540 — all overdue)
-- `src/lib/types.ts` — all shared types and contracts
-- `src/lib/env.ts` — Zod-validated env (groups: app, llm, paypal)
-- `src/lib/clock.ts` — `getNow()` with offset seam for time-travel demo
-- `src/lib/money.ts` — cents helpers, formatting
-- `src/lib/audit.ts` — audit helper
-- `src/lib/events.ts` — in-process event bus
-- Placeholder pages for all routes (Coming Soon stubs): `/`, `/invoices/[id]`, `/approvals`, `/policy`, `/audit`, `/mock-paypal/invoice/[id]`
-- Shared components: `app-nav.tsx`, `page-header.tsx`, `empty-state.tsx`
-- 56 passing unit tests (money, env, clock, queries, seed)
-- `vitest.config.mts`, `tsconfig.json`, `next.config.ts`, `drizzle.config.ts`, `tailwind.config.ts` all configured
-- `.env.example` documents all required env vars
 
-### 🚧 Not yet built (stubs / placeholders)
-- `src/lib/paypal/` — real + mock PayPal client implementations
+**Foundation (complete, 102 passing tests + 1 skipped):**
+- Full DB schema (Drizzle + SQLite) — all 10 tables: `owner_policy`, `clients`, `invoices`, `plans`, `messages`, `approvals`, `audit_log`, `webhook_events`, `mock_paypal_invoices`, `kv`
+- Full `queries.ts` — all read/write helpers including `updateInvoice`, `insertMockPaypalInvoice`, `getMockPaypalInvoice`, `updateMockPaypalInvoice`, `listReconcilableInvoices`
+- Seed script with 5 demo clients/invoices (Elena $2,400 · Priya $1,800 · Marcus $960 · Olivia $1,250 · Noah $540 — all overdue)
+- `src/lib/types.ts`, `env.ts`, `clock.ts`, `money.ts`, `audit.ts`, `events.ts`
+- `vitest.config.mts`, `tsconfig.json`, `next.config.ts`, `drizzle.config.ts`, `tailwind.config.ts` all configured
+- `.env.example`, `render.yaml` (live at https://paypal-ai-hackathon-9tkr.onrender.com)
+
+**PayPal integration (complete, prompt 03):**
+- `src/lib/paypal/map.ts` — type mapping, `buildCreateInvoiceBody`, `mapGetResponseToInvoice`, `mapPayPalStatus`, money conversions (reuses money.ts)
+- `src/lib/paypal/auth.ts` — OAuth2 client-credentials with in-memory token cache (refresh 60s early); never logs secrets
+- `src/lib/paypal/real.ts` — `RealPayPalClient`: 10s timeout, `PayPal-Request-Id` header, 2-retry on 5xx, typed `PayPalError`. **UNVERIFIED** (D32/D35)
+- `src/lib/paypal/mock.ts` — `MockPayPalClient` backed by `mock_paypal_invoices` table. IDs: `MOCK-INV2-<8hex>`. `simulatePayment` → PAID/PARTIALLY_PAID + `invoice.paid` event
+- `src/lib/paypal/reconcile.ts` — `reconcilePayPalInvoices()`: idempotent status sync, `UNEXPECTED_PAYMENT` approval on superseded invoices (D37)
+- `src/lib/paypal/simulate-payment.ts` — `simulateMockPayment()` and `simulateMockPaymentByLocalId()` — shared between route handlers (D2)
+- `src/lib/paypal/index.ts` — `getPayPal()` factory
+- `src/lib/paypal/smoke.ts` — `pnpm paypal:smoke` end-to-end test
+- `src/app/mock-paypal/invoice/[id]/page.tsx` — functional mock invoice page with MOCK badge, amount, status, pay button
+- `src/app/mock-paypal/invoice/[id]/mock-pay-now-button.tsx` — client component
+- `src/app/api/mock-paypal/pay/route.ts` — mock-mode-only route (409 in real mode), Zod-validated
+- **Tests:** 32 map tests + 9 mock lifecycle/reconcile tests + 1 skipped contract test
+
+**Shared components:** `app-nav.tsx`, `page-header.tsx`, `empty-state.tsx`
+**Placeholder pages:** `/`, `/invoices/[id]`, `/approvals`, `/policy`, `/audit`
+
+### 🚧 Not yet built
+
 - `src/lib/policy/` — plan evaluation logic
 - `src/lib/risk/` — risk scoring + explainer
 - `src/lib/agent/` — LLM tool-use loop, tools, prompt, classifier, scripts, next-action
@@ -81,7 +96,7 @@ pnpm db:seed       # reset + reseed demo data
 - `src/lib/approvals/service.ts` — owner decision handling
 - `src/lib/sim/client.ts` — simulated client personas
 - `src/lib/client-api.ts` — typed fetch helpers for UI
-- All API route handlers (agent, sim, approvals, policy, audit, webhooks, demo, events, mock-paypal)
+- API routes: `agent/run`, `agent/run-due`, `sim/client-reply`, `approvals/[id]`, `policy`, `webhooks/paypal`, `demo/{reset,simulate-payment,advance-time}`, `events`
 - All real UI pages (dashboard, invoice detail, approvals, policy, audit)
 - `src/evals/` — eval scenarios
 
@@ -148,23 +163,56 @@ src/
     money.ts                      # cents helpers
     audit.ts
     events.ts                     # event bus
-    llm.ts                        # Anthropic wrapper
+    llm.ts                        # Anthropic wrapper (stub)
     utils.ts                      # cn() etc
-    db/{schema.ts,client.ts,queries.ts,seed.ts,test-utils.ts}
-    paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}
-    policy/{index.ts,plan.ts}
-    risk/{index.ts,service.ts}
-    agent/{run.ts,tools.ts,prompt.ts,classify.ts,scripts.ts,next-action.ts}
-    approvals/service.ts
-    sim/client.ts
-    client-api.ts
-  evals/{scenarios.ts,run.ts,evals.test.ts}
+    db/
+      schema.ts                   # ✅ complete — all 10 tables
+      client.ts                   # ✅ Drizzle client
+      queries.ts                  # ✅ complete — all read/write helpers
+      seed.ts                     # ✅ demo data
+      test-utils.ts               # ✅ in-memory test DB helper
+    paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}  # 🚧
+    policy/{index.ts,plan.ts}                                        # 🚧
+    risk/{index.ts,service.ts}                                       # 🚧
+    agent/{run.ts,tools.ts,prompt.ts,classify.ts,scripts.ts,next-action.ts} # 🚧
+    approvals/service.ts                                             # 🚧
+    sim/client.ts                                                    # 🚧
+    client-api.ts                                                    # 🚧
+  evals/{scenarios.ts,run.ts,evals.test.ts}                         # 🚧
 data/                             # SQLite file (gitignored)
 docs/
+  01-product-brief.md
   02-architecture.md
+  03-data-model.md
   04-contracts.md
+  05-paypal-integration.md
+  06-agent-design.md
+  07-demo-and-submission.md
+  08-team-and-timeline.md
   DECISIONS.md
+render.yaml                       # Render deployment config
 ```
+
+---
+
+## DB Schema (actual tables in schema.ts)
+
+The schema uses Drizzle + SQLite. Key notes vs the original design doc:
+
+| Table | Notes |
+|---|---|
+| `owner_policy` | Single row (`id = "default"`). Replaces `config` table. |
+| `clients` | As designed. |
+| `invoices` | `risk_factors` stored as JSON text in `riskFactorsJson` column. |
+| `plans` | `installments` stored as JSON text in `installmentsJson` column. |
+| `messages` | Replaces `chat_messages`. Same columns. |
+| `approvals` | As designed. |
+| `audit_log` | `input`/`result` stored as JSON text in `inputJson`/`resultJson`. |
+| `webhook_events` | Stores raw PayPal webhook payloads (idempotency key = PayPal event id). |
+| `mock_paypal_invoices` | Fake PayPal invoice records for `PAYPAL_MODE=mock`. |
+| `kv` | Generic key-value store (used for clock offset in time-travel demo). |
+
+All queries live in `src/lib/db/queries.ts`. Use those functions — don't write raw SQL or access the schema directly from outside `src/lib/db/`.
 
 ---
 
@@ -322,6 +370,49 @@ export interface PayPalInvoice {
 
 ---
 
+## DB Queries API (src/lib/db/queries.ts)
+
+All implemented and tested. Use these — don't reach into the schema directly.
+
+```ts
+// Invoices
+listInvoices(db?): InvoiceWithClient[]           // joins client row
+getInvoice(id, db?): InvoiceRow | undefined
+
+// Messages
+getMessages(invoiceId, db?): ChatMessage[]
+insertMessage(message, db?): ChatMessage
+
+// Policy
+getPolicy(db?): OwnerPolicy | undefined
+upsertPolicy(policy, db?): OwnerPolicy
+
+// Approvals
+listApprovals(status?, db?): ApprovalRow[]
+insertApproval(input, db?): ApprovalRow
+resolveApproval(id, status, ownerResponse, resolvedAt?, db?): ApprovalRow | undefined
+
+// Audit
+insertAudit(input, db?): AuditEntry
+listAudit(invoiceId?, db?): AuditEntry[]
+
+// Plans
+getPlan(id, db?): PlanRow | undefined
+insertPlan(plan, db?): PlanRow
+updatePlan(id, update, db?): PlanRow | undefined
+
+// Webhooks (idempotency)
+upsertWebhookEvent(event, db?): boolean   // returns false if already seen
+
+// KV (clock offset etc.)
+getKv(key, db?): string | undefined
+setKv(key, value, db?): void
+```
+
+All query functions accept an optional `database` param for testing (use `createTestDb()` from `test-utils.ts`).
+
+---
+
 ## Policy Engine Rules (src/lib/policy/)
 
 Pure functions, fully unit-tested. **Never weaken these for demo convenience.**
@@ -388,11 +479,11 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 
 | Client | Invoice | Amount | Days Overdue | Scenario |
 |---|---|---|---|---|
-| Elena Martinez | CH-2026-101 | $2,400 | 23 | Main story: requests plan → above auto-approve threshold → owner signs off → agent sends offer → Elena accepts → installment invoices created |
-| Priya Shah | CH-2026-102 | $1,800 | 31 | Requests 40% discount (out of bounds) → escalates as `DISCOUNT_REQUEST` → owner counters 5% → agent relays → negotiation |
-| Marcus Lee | CH-2026-103 | $960 | 14 | Standard nudge → accepts plan within policy |
-| Olivia Chen | CH-2026-104 | $1,250 | 9 | Early chase → schedules follow-up |
-| Noah Williams | CH-2026-105 | $540 | 5 | Short gentle nudge |
+| Elena Martinez | CH-2026-101 | \$2,400 | 23 | Main story: requests plan → above auto-approve threshold → owner signs off → agent sends offer → Elena accepts → installment invoices created |
+| Priya Shah | CH-2026-102 | \$1,800 | 31 | Requests 40% discount (out of bounds) → escalates as `DISCOUNT_REQUEST` → owner counters 5% → agent relays → negotiation |
+| Marcus Lee | CH-2026-103 | \$960 | 14 | Standard nudge → accepts plan within policy |
+| Olivia Chen | CH-2026-104 | \$1,250 | 9 | Early chase → schedules follow-up |
+| Noah Williams | CH-2026-105 | \$540 | 5 | Short gentle nudge |
 
 ---
 
@@ -413,7 +504,7 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 
 ## Key Gotchas & Decisions
 
-- **`getNow()` not `new Date()`** — always use `src/lib/clock.ts`'s `getNow()` so time-travel demo works
+- **`getNow()` not `new Date()`** — always use `src/lib/clock.ts`'s `getNow()` so time-travel demo works. Clock offset is persisted in the `kv` table (key: `clock_offset_ms`)
 - **shadcn/ui**: configured by hand (no `shadcn init`). No components installed yet. To add: `pnpm dlx shadcn@latest add <component>` from a networked machine
 - **`db:push` "index already exists"** — known harmless warning; schema is already applied
 - **`better-sqlite3`**: ships prebuilt binaries, no `node-gyp` needed. Keep it in `serverExternalPackages` in `next.config.ts`
@@ -424,6 +515,9 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 - **`rebasePlan` before `create_plan_invoices`** — shifts dates forward if deposit date has passed (advance-time demo case)
 - **`chase_state` changed by code only** — never by LLM text. The LLM classifies intent via structured output; handlers change state
 - **SSE vs polling** — implement SSE at `/api/events`; UI can fall back to 2s polling if SSE is a time sink
+- **DB table name mapping** — `chat_messages` → `messages`, `config` → `owner_policy`, `kv` table added for clock offset. Don't reference old names
+- **Render deployment** — free tier sleeps after inactivity; `db:seed` runs on every boot (idempotent). `APP_BASE_URL` set to live Render URL in `render.yaml`
+- **`webhook_events` table** — deduplicate PayPal webhooks by PayPal event ID using `upsertWebhookEvent()` which returns `false` on duplicate
 
 ---
 
@@ -462,4 +556,4 @@ Cross-area changes go through `docs/04-contracts.md` contracts or coordinated PR
 
 ---
 
-*Handoff generated Nov 3 2026. Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon*
+*Handoff updated Nov 3 2026 (prompt 03 — PayPal integration complete). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
