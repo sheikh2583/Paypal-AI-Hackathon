@@ -17,7 +17,7 @@ services:
       - key: PAYPAL_MODE
         value: mock
       - key: APP_BASE_URL
-        sync: false
+        value: https://paypal-ai-hackathon-9tkr.onrender.com
       - key: ANTHROPIC_API_KEY
         sync: false
 
