@@ -96,4 +96,8 @@ Resolved before prompt 01, in response to the gap review after prompt 00. Each e
 
 **D36. Mock invoice ID format.** Mock PayPal invoice IDs use the format `MOCK-INV2-<uuid-prefix>` (first 8 chars of a UUID) to be clearly non-real while matching `INV2-` prefix convention. This is stored in `mock_paypal_invoices.id` and surfaced as `paypalInvoiceId` in our `PayPalInvoice` type.
 
+**D38. Risk label thresholds.** `riskLabel(score)` returns: `< 35` → Low, `35–64` → Medium, `≥ 65` → High. Rationale: a freshly-seeded invoice (10 base + 20 overdue for 15-30 days + 5 medium-amount) scores ~35 — Medium feels right at that boundary. Low covers genuinely low-risk recent invoices; High starts at 65 which requires multiple compounding factors (very overdue + high amount + poor history).
+
+**D39. `docs/03-data-model.md` and `docs/06-agent-design.md` absent.** Both referenced in AGENTS.md but not present in the repo. Risk feature table for prompt 04 was provided inline in the prompt; implemented as specified. No schema deviation from what `src/lib/types.ts` and `docs/04-contracts.md` already define.
+
 **D37. reconcile idempotency mechanism.** `reconcilePayPalInvoices()` checks status before updating: if local status already matches the PayPal-derived status, it skips the update and emits no event, preventing duplicate audit rows and events on repeated runs. For UNEXPECTED_PAYMENT on SUPERSEDED invoices, it checks for an existing PENDING approval of kind `UNEXPECTED_PAYMENT` for that invoice before inserting a new one.
