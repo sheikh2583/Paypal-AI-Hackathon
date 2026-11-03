@@ -42,6 +42,8 @@ Elena's plan exceeds the auto-approve threshold, so her journey demonstrates the
 
 Backup path for every step: mock mode + scripted LLM mode, same UI.
 
+**Current guided UI:** the Dashboard lists live seeded invoice state and includes “Run next Dana step.” Use it once for the reminder, again for Dana's scripted split-payment reply and policy-checked proposal, and a third time for her acceptance and mock PayPal installment invoices. On Dana's invoice detail, “Simulate deposit payment” pays the first mock installment and refreshes the invoice state. Reset demo restores the fictional seed scenario after a presentation. The guided sequence uses `ScriptedLLM`, so it works without any provider key and does not send real client messages or real payments.
+
 ## Demo mode checklist (Person C)
 
 - One-click "Reset demo" (reseeds, clears audit)
