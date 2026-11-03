@@ -25,12 +25,25 @@ describe("getAppEnv", () => {
       appBaseUrl: "http://localhost:3000",
       databasePath: "./data/chaser.db",
       demoNow: undefined,
+      demoPublic: false,
     });
   });
 
   it("accepts a pinned DEMO_NOW and rejects garbage", () => {
     expect(getAppEnv({ DEMO_NOW: "2026-11-02" }).demoNow).toBe("2026-11-02");
     expect(() => getAppEnv({ DEMO_NOW: "next tuesday" })).toThrow(EnvError);
+  });
+
+  it("DEMO_PUBLIC=1 sets demoPublic to true; off by default", () => {
+    expect(getAppEnv({ DEMO_PUBLIC: "1" }).demoPublic).toBe(true);
+    expect(getAppEnv({ DEMO_PUBLIC: "0" }).demoPublic).toBe(false);
+    expect(getAppEnv({}).demoPublic).toBe(false);
+    expect(getAppEnv({ DEMO_PUBLIC: "" }).demoPublic).toBe(false);
+  });
+
+  it("DEMO_PUBLIC rejects values other than 0 and 1", () => {
+    expect(() => getAppEnv({ DEMO_PUBLIC: "true" })).toThrow(EnvError);
+    expect(() => getAppEnv({ DEMO_PUBLIC: "yes" })).toThrow(EnvError);
   });
 });
 

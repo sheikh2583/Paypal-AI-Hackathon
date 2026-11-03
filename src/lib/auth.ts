@@ -3,11 +3,13 @@ import { betterAuth } from "better-auth";
 import { twoFactor } from "better-auth/plugins";
 import { headers } from "next/headers";
 import { db } from "@/lib/db/client";
-import { getAuthEnv } from "@/lib/env";
+import { getAppEnv, getAuthEnv } from "@/lib/env";
 import { sendAuthEmail } from "@/lib/auth-email";
 import { ensureAuthTokenSchema, ensureRateLimitIdColumn, hashEmailOtp, resetPasswordIdentifier, storeEmailVerificationToken } from "@/lib/auth-tokens";
 
 const settings = getAuthEnv();
+// Checked at module load so individual call-sites don't each re-read the env.
+const isDemoPublic = getAppEnv().demoPublic;
 const buildOrLocalSecret = randomBytes(32).toString("base64url");
 const authSecret = settings.secret ?? buildOrLocalSecret;
 
@@ -142,6 +144,8 @@ export function ensureAuthSchema(): Promise<void> {
 }
 
 export function getAuthReadiness(): { ready: boolean; missing: string[]; testingSender: boolean } {
+  // When DEMO_PUBLIC is on, auth readiness is never the blocker — the whole gate is bypassed.
+  if (isDemoPublic) return { ready: true, missing: [], testingSender: false };
   const required: Array<[keyof ReturnType<typeof getAuthEnv>, string]> = [
     ["ownerEmail", "AUTH_OWNER_EMAIL"],
     ["secret", "BETTER_AUTH_SECRET"],
@@ -163,6 +167,9 @@ export async function getOwnerAccountExists(): Promise<boolean> {
 }
 
 export async function getDemoSession() {
+  // In public demo mode every request is treated as authenticated; the real auth
+  // system is untouched so turning DEMO_PUBLIC off restores normal behaviour.
+  if (isDemoPublic) return { user: { email: "demo@example.com" }, session: {} } as const;
   if (!getAuthReadiness().ready) return null;
   await ensureAuthSchema();
   const session = await auth.api.getSession({ headers: await headers() });

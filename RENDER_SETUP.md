@@ -1,87 +1,73 @@
-# Render Production Setup Guide
+# Render Deployment Guide
 
-## Critical: Persistent Disk Configuration
+## Architecture on Render Free
 
-The application uses SQLite for data storage. Render's free tier does not persist files between deploys unless a **persistent disk** is configured.
+Render Free does **not** offer a persistent disk. Every spin-down or redeploy wipes the
+ephemeral filesystem, including the SQLite file. This is intentional for the hackathon demo:
 
-### Required Configuration
+- **`DEMO_PUBLIC=1`** removes the login requirement entirely — judges browse without creating
+  an account or receiving email.
+- The startup sequence recreates the database from scratch on every cold boot in ~5–10 s.
+- No data entered by a judge persists across restarts (demo-safe; no real user data).
 
-1. **Add a Persistent Disk in Render Dashboard:**
-   - Go to your service settings in Render dashboard
-   - Navigate to "Disks" section
-   - Click "Add Disk"
-   - Set the mount path to: `/app/data`
-   - Choose an appropriate size (1GB minimum recommended)
+## Startup Sequence (render.yaml)
 
-2. **Verify DATABASE_PATH Environment Variable:**
-   ```
-   DATABASE_PATH=./data/chaser.db
-   ```
-   
-   This is already configured in `render.yaml`, but verify it matches in your Render dashboard.
-
-### Without Persistent Disk
-
-If no persistent disk is configured:
-- The database will be created in the ephemeral filesystem
-- All data (users, authentication sessions, invoices, etc.) will be **lost on every deploy**
-- The owner account will need to be recreated after each deploy
-- This is acceptable for demo/testing but **not for production use**
-
-### Database Migration Safety
-
-The `startCommand` in `render.yaml` runs `pnpm auth:migrate` before starting the server:
-
-```yaml
-startCommand: npx pnpm@10.28.0 auth:migrate && npx pnpm@10.28.0 start
+```
+db:push → auth:migrate → db:seed-if-empty → next start
 ```
 
-This ensures:
-- Better Auth schema migrations run automatically on startup
-- The `rateLimit` table schema is repaired before migrations (fixes the schema mismatch error)
-- Existing authentication data and application data are preserved
-- Migrations are idempotent and safe to run on every deploy
+| Step | Command | What it does |
+|---|---|---|
+| 1 | `pnpm db:push --accept-data-loss` | Creates/updates the business schema (idempotent) |
+| 2 | `pnpm auth:migrate` | Runs Better Auth migrations; repairs rateLimit schema |
+| 3 | `pnpm db:seed-if-empty` | Seeds demo data **only** when the invoices table is empty |
+| 4 | `pnpm start` | Serves the Next.js app |
 
-### Environment Variables Required
+All steps are non-interactive and safe to repeat.
 
-Ensure these are set in Render dashboard (marked `sync: false` in render.yaml):
+## Environment Variables
 
-- `AUTH_OWNER_EMAIL` - Email address allowed to create the owner account
-- `BETTER_AUTH_SECRET` - Secret key for Better Auth (generate with `openssl rand -base64 32`)
-- `RESEND_API_KEY` - API key for Resend email service
-- `ANTHROPIC_API_KEY` - API key for Claude LLM (if not using mock mode)
+The following are set in `render.yaml` directly:
 
-Optional:
-- `RESEND_FROM` - Email sender address (defaults to test sender in render.yaml)
+| Variable | Value |
+|---|---|
+| `DEMO_PUBLIC` | `1` — bypasses auth gate for judges |
+| `APP_BASE_URL` | Your Render service URL |
+| `PAYPAL_MODE` | `mock` |
+| `LLM_MODE` | `auto` |
 
-### Deployment Flow
+The following are set in the Render dashboard (`sync: false`):
 
-1. Build completes successfully
-2. Migrations run via `pnpm auth:migrate`:
-   - Checks if `rateLimit` table exists
-   - If it exists and lacks `id` column, adds it
-   - Runs Better Auth migrations
-   - Creates custom `auth_email_verification_tokens` table
-3. Application starts with `pnpm start`
-4. Navigate to `/setup` to create the owner account (first deploy only)
+| Variable | Purpose |
+|---|---|
+| `AUTH_OWNER_EMAIL` | Owner email (optional when `DEMO_PUBLIC=1`) |
+| `BETTER_AUTH_SECRET` | Better Auth signing secret (optional when `DEMO_PUBLIC=1`) |
+| `RESEND_API_KEY` | Email delivery (not needed with `DEMO_PUBLIC=1`) |
+| `ANTHROPIC_API_KEY` | Claude LLM; leave blank for scripted/offline demo mode |
 
-### Troubleshooting
+> **Note:** With `DEMO_PUBLIC=1` none of the auth-related variables are required. The app
+> works without them. Set them if you want to later switch off `DEMO_PUBLIC` and use real auth.
+
+## Turning off DEMO_PUBLIC (post-hackathon)
+
+1. Remove `DEMO_PUBLIC=1` from `render.yaml` (or set to `0`).
+2. Add a persistent database (Render's managed PostgreSQL, or a Turso/Neon SQLite-over-HTTP).
+3. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM`.
+4. Navigate to `/setup` to create the owner account.
+
+> **Do not add a "persistent disk" on Render Free.** Persistent disks are a paid Render
+> feature and are not available on the free plan. The demo is designed to work without one.
+
+## Troubleshooting
 
 **"Database schema mismatch" error:**
-- Fixed in this deployment by reordering migration steps
-- The `rateLimit.id` column is now added BEFORE Better Auth validates the schema
+Repaired in `ensureAuthSchema()` — the `rateLimit.id` column is added *before* Better Auth
+validates the schema. Fully idempotent; safe to re-run.
 
-**"Owner account already exists" at /setup:**
-- This is expected behavior if the owner was already created
-- Use the `/login` page instead
-- To reset (development only): delete the database file and redeploy
+**Demo data missing after a restart:**
+`db:seed-if-empty` runs on every startup. If it reports "already has data" unexpectedly,
+`pnpm db:seed` (the destructive full-reseed) can be run manually via Render's shell.
 
-**Email verification not working:**
-- Verify `RESEND_API_KEY` and `RESEND_FROM` are set
-- Check Render logs for email sending errors
-- Test sender (`onboarding@resend.dev`) may have delivery restrictions
-
-**Data lost after deploy:**
-- Verify persistent disk is mounted at `/app/data`
-- Check that `DATABASE_PATH=./data/chaser.db` resolves to the mounted disk
-- Render may require absolute path: `DATABASE_PATH=/app/data/chaser.db`
+**Judges see a login page:**
+Ensure `DEMO_PUBLIC=1` is set in `render.yaml` and that the deploy completed successfully.
+Check Render logs for any startup step failures.

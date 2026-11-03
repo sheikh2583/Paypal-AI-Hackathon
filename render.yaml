@@ -5,14 +5,18 @@ services:
     region: oregon
     plan: free
     buildCommand: npx --yes pnpm@10.28.0 install --frozen-lockfile && npx pnpm@10.28.0 run build
-    # CRITICAL: auth:migrate must run before start to repair schema and run Better Auth migrations
-    startCommand: npx pnpm@10.28.0 auth:migrate && npx pnpm@10.28.0 start
+    # Startup order (D56):
+    #   1. db:push      — creates/updates the business schema (idempotent, non-interactive)
+    #   2. auth:migrate — runs Better Auth migrations and repairs rateLimit schema
+    #   3. db:seed-if-empty — seeds demo data only when invoices table is empty; safe on every boot
+    #   4. next start   — serves the app
+    # Render Free wipes the ephemeral filesystem on every spin-down, so steps 1–3 must
+    # all run on startup to restore a usable DB from scratch in under ~10 s.
+    startCommand: npx pnpm@10.28.0 db:push --accept-data-loss && npx pnpm@10.28.0 auth:migrate && npx pnpm@10.28.0 db:seed-if-empty && npx pnpm@10.28.0 start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
-      # IMPORTANT: If using a persistent disk mounted at /app/data, this path will resolve correctly.
-      # Without a persistent disk, the database will be ephemeral and reset on every deploy.
       - key: DATABASE_PATH
         value: ./data/chaser.db
       - key: LLM_MODE
@@ -21,6 +25,9 @@ services:
         value: mock
       - key: APP_BASE_URL
         value: https://paypal-ai-hackathon-9tkr.onrender.com
+      # Bypass auth for hackathon judges: no login required, no Resend needed.
+      - key: DEMO_PUBLIC
+        value: "1"
       - key: AUTH_OWNER_EMAIL
         sync: false
       - key: BETTER_AUTH_SECRET
@@ -31,4 +38,3 @@ services:
         value: "PayPal Hackathon <onboarding@resend.dev>"
       - key: ANTHROPIC_API_KEY
         sync: false
-

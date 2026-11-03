@@ -356,3 +356,23 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exitCode = 1;
   });
 }
+
+/**
+ * Seed only when the invoices table is empty.
+ * Safe to call on every startup: never reseeds a database that already has data.
+ * Returns true when seeding ran, false when skipped.
+ */
+export async function seedIfEmpty(
+  database: AppDb = db,
+  options: SeedOptions = {},
+): Promise<boolean> {
+  const row = database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number };
+  if (row.count > 0) {
+    console.log(`seedIfEmpty: ${row.count} invoice(s) already present — skipping seed.`);
+    return false;
+  }
+  console.log("seedIfEmpty: invoices table is empty — seeding demo data.");
+  const summaries = await seedDatabase(database, options);
+  console.log(`seedIfEmpty: seeded ${summaries.length} overdue invoices.`);
+  return true;
+}

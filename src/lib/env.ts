@@ -29,6 +29,9 @@ const appSchema = z.object({
       .refine((s) => !Number.isNaN(Date.parse(s)), "must be an ISO date or datetime")
       .optional(),
   ),
+  // When DEMO_PUBLIC=1, the auth gate is bypassed and the app is open to judges without login.
+  // Default off; set to "1" in render.yaml for the hackathon demo deployment only.
+  DEMO_PUBLIC: z.preprocess(blankToUndefined, z.enum(["0", "1"]).default("0")),
 });
 
 // ---------------------------------------------------------------------------
@@ -132,6 +135,11 @@ export interface AppEnv {
   databasePath: string;
   /** Pinned "today" for the demo, if set. Consumed by src/lib/clock.ts. */
   demoNow: string | undefined;
+  /**
+   * When true, skip the auth gate entirely so judges can browse without login.
+   * Controlled by DEMO_PUBLIC=1 in the environment; default off.
+   */
+  demoPublic: boolean;
 }
 
 export function getAppEnv(source: EnvSource = process.env): AppEnv {
@@ -140,6 +148,7 @@ export function getAppEnv(source: EnvSource = process.env): AppEnv {
     appBaseUrl: e.APP_BASE_URL,
     databasePath: e.DATABASE_PATH,
     demoNow: e.DEMO_NOW,
+    demoPublic: e.DEMO_PUBLIC === "1",
   };
 }
 

@@ -210,3 +210,36 @@ describe("seedDatabase", () => {
     }
   });
 });
+
+describe("seedIfEmpty (D56)", () => {
+  it("seeds the DB when the invoices table is empty and returns true", async () => {
+    const { seedIfEmpty } = await import("./seed");
+    const database = createTestDb();
+    try {
+      const result = await seedIfEmpty(database, { paypalMode: "mock" });
+      expect(result).toBe(true);
+      const count = (database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number }).count;
+      expect(count).toBeGreaterThan(0);
+    } finally {
+      closeTestDb(database);
+    }
+  });
+
+  it("skips seeding when invoices already exist and returns false", async () => {
+    const { seedIfEmpty } = await import("./seed");
+    const database = createTestDb();
+    try {
+      // First call seeds
+      await seedIfEmpty(database, { paypalMode: "mock" });
+      const countAfterFirst = (database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number }).count;
+
+      // Second call must skip — count must not change
+      const result = await seedIfEmpty(database, { paypalMode: "mock" });
+      expect(result).toBe(false);
+      const countAfterSecond = (database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number }).count;
+      expect(countAfterSecond).toBe(countAfterFirst);
+    } finally {
+      closeTestDb(database);
+    }
+  });
+});
