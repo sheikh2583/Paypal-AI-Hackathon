@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/login-form";
-import { getDemoSession } from "@/lib/auth";
-import { getDemoAuthEnv } from "@/lib/env";
+import { getAuthReadiness, getDemoSession, getOwnerAccountExists } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Sign in" };
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   if (await getDemoSession()) redirect("/");
-  const { email, password } = getDemoAuthEnv();
-  return <LoginForm demoEmail={email} demoPassword={password} />;
+  const [ownerAccountExists] = await Promise.all([getOwnerAccountExists()]);
+  return <LoginForm authConfigured={getAuthReadiness().ready} ownerAccountExists={ownerAccountExists} />;
 }

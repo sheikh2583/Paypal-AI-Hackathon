@@ -1,37 +1,28 @@
-import { describe, expect, it } from "vitest";
-import { credentialsAreValid, createDemoSessionToken, demoSessionFromCookieHeader, DEMO_SESSION_COOKIE, verifyDemoSessionToken } from "./auth";
-import type { DemoAuthEnv } from "./env";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { authEmailHtml, sendAuthEmail } from "./auth-email";
 
-const config: DemoAuthEnv = {
-  email: "demo@chaser.test",
-  password: "chaser-demo-2026",
-  sessionSecret: "test-session-secret-long-enough-for-signing-32-characters",
-};
+afterEach(() => vi.unstubAllGlobals());
 
-describe("single-owner demo authentication", () => {
-  it("accepts the configured demo credentials and normalizes the email", () => {
-    expect(credentialsAreValid(" DEMO@CHASER.TEST ", "chaser-demo-2026", config)).toBe(true);
-    expect(credentialsAreValid("demo@chaser.test", "wrong-password", config)).toBe(false);
-    expect(credentialsAreValid("other@chaser.test", "chaser-demo-2026", config)).toBe(false);
+describe("authentication email", () => {
+  it("escapes all user and link content in HTML", () => {
+    const html = authEmailHtml({ to: "owner@example.test", subject: "test", heading: "<script>bad</script>", message: "A & B", actionLabel: "Continue", actionUrl: "https://example.test/?x=\"<bad>", footer: "'" });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&amp;");
+    expect(html).toContain("&quot;");
   });
 
-  it("verifies signed sessions and rejects altered, expired, or foreign-owner sessions", () => {
-    const token = createDemoSessionToken(config.email, config.sessionSecret!, 2_000);
-    expect(verifyDemoSessionToken(token, config.sessionSecret!, config, 1_999)).toMatchObject({ email: config.email });
-    expect(verifyDemoSessionToken(token, "a-different-secret-long-enough-to-sign-this-value", config, 1_999)).toBeNull();
-    expect(verifyDemoSessionToken(token, config.sessionSecret!, config, 2_000)).toBeNull();
-    const foreignToken = createDemoSessionToken("intruder@chaser.test", config.sessionSecret!, 2_000);
-    expect(verifyDemoSessionToken(foreignToken, config.sessionSecret!, config, 1_999)).toBeNull();
+  it("sends through Resend without exposing the API key in failures", async () => {
+    const key = "resend-secret-test";
+    const fetchMock = vi.fn().mockResolvedValue(new Response("sensitive provider response", { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(sendAuthEmail({ to: "owner@example.test", subject: "Reset", heading: "Reset", message: "Choose a password", actionLabel: "Reset", actionUrl: "https://example.test/reset" }, { ownerEmail: "owner@example.test", baseUrl: "https://example.test", secret: "x".repeat(32), resendApiKey: key, emailFrom: "Chaser <noreply@example.test>" })).rejects.toThrow("HTTP 401");
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe(`Bearer ${key}`);
+    expect(fetchMock.mock.calls[0][1].body).not.toContain(key);
+    try { await sendAuthEmail({ to: "owner@example.test", subject: "Reset", heading: "Reset", message: "", actionLabel: "Reset", actionUrl: "https://example.test" }, { ownerEmail: "owner@example.test", baseUrl: "https://example.test", secret: "x".repeat(32), resendApiKey: key, emailFrom: "Chaser <noreply@example.test>" }); } catch (error) { expect(String(error)).not.toContain(key); }
   });
 
-  it("rejects malformed and unsigned session tokens", () => {
-    expect(verifyDemoSessionToken(undefined, config.sessionSecret!, config)).toBeNull();
-    expect(verifyDemoSessionToken("not-a-session", config.sessionSecret!, config)).toBeNull();
-  });
-
-  it("reads a valid signed session from the request cookie header", () => {
-    const token = createDemoSessionToken(config.email, config.sessionSecret!, Math.floor(Date.now() / 1000) + 600);
-    expect(demoSessionFromCookieHeader(`theme=dark; ${DEMO_SESSION_COOKIE}=${token}`, config)).toMatchObject({ email: config.email });
-    expect(demoSessionFromCookieHeader("theme=dark", config)).toBeNull();
+  it("fails with configuration variable names and no secret values", async () => {
+    await expect(sendAuthEmail({ to: "owner@example.test", subject: "Reset", heading: "Reset", message: "", actionLabel: "Reset", actionUrl: "https://example.test" }, { ownerEmail: undefined, baseUrl: "http://localhost:3000", secret: undefined, resendApiKey: undefined, emailFrom: undefined })).rejects.toThrow(/RESEND_API_KEY/);
   });
 });

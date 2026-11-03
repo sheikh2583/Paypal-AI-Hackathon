@@ -209,12 +209,11 @@ Not tools (the LLM cannot do these): changing policy, marking an invoice paid, c
 
 ## HTTP API (route handlers) — Person C consumes, A/B implement
 
-All owner pages, mock invoice pages, and mutation APIs require the signed single-owner demo session except `POST /api/auth/login`, `POST /api/auth/logout`, and PayPal webhooks. The demo credentials are intentionally public and only gate the fictional demo workspace.
+All owner pages, mock invoice pages, and mutation APIs require a verified single-owner Better Auth session with email OTP, except the auth endpoints and PayPal webhooks. Initial account creation is allowed only once, for `AUTH_OWNER_EMAIL`; no public demo credentials are shipped.
 
 | method + path | body | returns |
 |---|---|---|
-| `POST /api/auth/login` | `{email, password}` | `{ok:true}` and sets the HttpOnly demo session cookie |
-| `POST /api/auth/logout` | – | `{ok:true}` and clears the demo session cookie |
+| `GET/POST /api/auth/[...all]` | Better Auth payloads | Email/password sign-up and sign-in, email verification, OTP challenge, password reset, session and sign-out endpoints; setup gate permits only the first configured owner |
 | `GET /api/invoices` | – | `InvoiceListItem[]` (with client, risk, chaseState, nextAction) |
 | `GET /api/invoices/:id` | – | invoice + messages + plan + approvals |
 | `POST /api/agent/run` | `{invoiceId}` | `AgentRunResult` |

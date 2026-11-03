@@ -83,12 +83,12 @@ prompts/
 
 ## Request flows
 
-### 0. Single-owner demo login
+### 0. Single-owner authentication
 
-1. `/login` displays the public demo-only credentials and a button that fills them into the form.
-2. `POST /api/auth/login` validates the credentials and sets a seven-day, signed `HttpOnly`, `SameSite=Lax` cookie (`Secure` in production). The signing secret is `AUTH_SESSION_SECRET`, or a process-generated random secret when unset.
-3. The `(app)` layout redirects unsigned sessions to `/login`; state-changing API routes and the mock invoice page independently verify the same session. `POST /api/auth/logout` expires the cookie.
-4. This is a single shared demo-owner gate for fictional data, not production identity management. Set a shared `AUTH_SESSION_SECRET` in multi-instance deployments so sessions validate consistently.
+1. `/setup` creates the one owner account only when the database has no user and the submitted email matches `AUTH_OWNER_EMAIL`; the app closes registration after that first account.
+2. Better Auth stores password hashes and sessions in the same SQLite database. It sends email verification and password-reset links through Resend; passwords require at least 14 characters and reset revokes existing sessions.
+3. Email OTP is enabled for the owner during account creation. Sign-in requires password and a one-time code; only a verified, OTP-enabled owner session can access the workspace.
+4. `/api/auth/[...all]` provides the Better Auth endpoints. The `(app)` layout, mutation routes and mock invoice page independently verify the owner session. Cookies are HttpOnly and SameSite=Lax, with Secure on HTTPS. Configure `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_OWNER_EMAIL`, `RESEND_API_KEY`, and a verified `AUTH_EMAIL_FROM`; no public demo credentials exist.
 
 ### A. Agent run on an overdue invoice
 1. Owner clicks "Run Chaser" (or a scheduled demo trigger).

@@ -13,7 +13,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest): Promise<Response> {
-  if (!isDemoRequestAuthenticated(req)) return unauthorizedResponse();
+  if (!(await isDemoRequestAuthenticated())) return unauthorizedResponse();
   // Guard: mock mode only.
   const env = getPayPalEnv();
   if (env.mode !== "mock") {

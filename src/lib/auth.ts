@@ -1,95 +1,133 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
-import { getDemoAuthEnv, type DemoAuthEnv } from "@/lib/env";
+import { randomBytes } from "node:crypto";
+import { betterAuth } from "better-auth";
+import { twoFactor } from "better-auth/plugins";
+import { headers } from "next/headers";
+import { db } from "@/lib/db/client";
+import { getAuthEnv } from "@/lib/env";
+import { sendAuthEmail } from "@/lib/auth-email";
 
-export const DEMO_SESSION_COOKIE = "chaser_demo_session";
-export const DEMO_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+const settings = getAuthEnv();
+const buildOrLocalSecret = randomBytes(32).toString("base64url");
 
-interface DemoSession {
-  email: string;
-  expiresAt: number;
+export const auth = betterAuth({
+  appName: "Chaser",
+  baseURL: settings.baseUrl,
+  secret: settings.secret ?? buildOrLocalSecret,
+  database: db.$client,
+  trustedOrigins: [settings.baseUrl],
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 14,
+    maxPasswordLength: 128,
+    requireEmailVerification: true,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendAuthEmail({
+        to: user.email,
+        subject: "Reset your Chaser password",
+        heading: "Choose a new password",
+        message: "We received a request to reset the password for your Chaser owner account.",
+        actionLabel: "Reset password",
+        actionUrl: url,
+        footer: "This link expires automatically and can only be used once.",
+      });
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendOnSignIn: true,
+    autoSignInAfterVerification: false,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendAuthEmail({
+        to: user.email,
+        subject: "Verify your Chaser email",
+        heading: "Verify your email address",
+        message: "Confirm that this email belongs to you to activate your Chaser owner account.",
+        actionLabel: "Verify email",
+        actionUrl: url,
+        footer: "If you did not create this account, ignore this message.",
+      });
+    },
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
+  rateLimit: {
+    enabled: true,
+  },
+  advanced: {
+    useSecureCookies: settings.baseUrl.startsWith("https://"),
+    defaultCookieAttributes: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: settings.baseUrl.startsWith("https://"),
+    },
+  },
+  plugins: [
+    twoFactor({
+      otpOptions: {
+        async sendOTP({ user, otp }) {
+          await sendAuthEmail({
+            to: user.email,
+            subject: "Your Chaser sign-in code",
+            heading: "Confirm it’s you",
+            message: `Your one-time sign-in code is ${otp}. It expires shortly and can only be used once.`,
+            actionLabel: "Return to Chaser",
+            actionUrl: `${settings.baseUrl}/login`,
+          });
+        },
+      },
+    }),
+  ],
+});
+
+let authSchemaReady: Promise<void> | undefined;
+
+/** Better Auth owns its auth tables and applies its migrations to the shared SQLite file. */
+export function ensureAuthSchema(): Promise<void> {
+  authSchemaReady ??= auth.$context.then(async (context) => {
+    await context.runMigrations();
+  });
+  return authSchemaReady;
 }
 
-type AuthGlobal = typeof globalThis & { __chaserDemoSessionSecret?: string };
-
-function sessionSecret(config = getDemoAuthEnv()): string {
-  if (config.sessionSecret) return config.sessionSecret;
-  const root = globalThis as AuthGlobal;
-  root.__chaserDemoSessionSecret ??= randomBytes(32).toString("base64url");
-  return root.__chaserDemoSessionSecret;
+export function getAuthReadiness(): { ready: boolean; missing: string[] } {
+  const required: Array<[keyof ReturnType<typeof getAuthEnv>, string]> = [
+    ["ownerEmail", "AUTH_OWNER_EMAIL"],
+    ["secret", "BETTER_AUTH_SECRET"],
+    ["resendApiKey", "RESEND_API_KEY"],
+    ["emailFrom", "AUTH_EMAIL_FROM"],
+  ];
+  const missing = required.filter(([key]) => !settings[key]).map(([, name]) => name);
+  return { ready: missing.length === 0, missing };
 }
 
-function fixedTimeEqual(left: string, right: string): boolean {
-  const leftHash = createHash("sha256").update(left).digest();
-  const rightHash = createHash("sha256").update(right).digest();
-  return timingSafeEqual(leftHash, rightHash);
+export async function getOwnerAccountExists(): Promise<boolean> {
+  await ensureAuthSchema();
+  const row = db.$client.prepare('SELECT COUNT(*) AS count FROM "user"').get() as { count: number };
+  return row.count > 0;
 }
 
-export function credentialsAreValid(email: string, password: string, config = getDemoAuthEnv()): boolean {
-  return fixedTimeEqual(email.trim().toLowerCase(), config.email)
-    && fixedTimeEqual(password, config.password);
+export async function getDemoSession() {
+  if (!getAuthReadiness().ready) return null;
+  await ensureAuthSchema();
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return null;
+  if (session.user.email.toLowerCase() !== settings.ownerEmail) return null;
+  if (!session.user.emailVerified || !session.user.twoFactorEnabled) return null;
+  return session;
 }
 
-function sign(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("base64url");
-}
-
-export function createDemoSessionToken(
-  email: string,
-  secret: string,
-  expiresAt = Math.floor(Date.now() / 1000) + DEMO_SESSION_MAX_AGE_SECONDS,
-): string {
-  const payload = Buffer.from(JSON.stringify({ email: email.toLowerCase(), expiresAt } satisfies DemoSession)).toString("base64url");
-  return `${payload}.${sign(payload, secret)}`;
-}
-
-export function verifyDemoSessionToken(
-  token: string | undefined,
-  secret: string,
-  config: DemoAuthEnv = getDemoAuthEnv(),
-  nowSeconds = Math.floor(Date.now() / 1000),
-): DemoSession | null {
-  if (!token) return null;
-  const [payload, signature, extra] = token.split(".");
-  if (!payload || !signature || extra !== undefined || !fixedTimeEqual(signature, sign(payload, secret))) return null;
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const session = parsed as Partial<DemoSession>;
-    if (typeof session.email !== "string" || session.email !== config.email) return null;
-    if (typeof session.expiresAt !== "number" || session.expiresAt <= nowSeconds) return null;
-    return { email: session.email, expiresAt: session.expiresAt };
-  } catch {
-    return null;
-  }
-}
-
-export function demoSessionFromCookieHeader(cookieHeader: string | null, config = getDemoAuthEnv()): DemoSession | null {
-  const prefix = `${DEMO_SESSION_COOKIE}=`;
-  const value = cookieHeader?.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix))?.slice(prefix.length);
-  return verifyDemoSessionToken(value, sessionSecret(config), config);
-}
-
-export async function getDemoSession(): Promise<DemoSession | null> {
-  const cookieStore = await cookies();
-  return verifyDemoSessionToken(cookieStore.get(DEMO_SESSION_COOKIE)?.value, sessionSecret(), getDemoAuthEnv());
-}
-
-export function demoSessionCookie(email: string, config = getDemoAuthEnv()): string {
-  const token = createDemoSessionToken(email, sessionSecret(config));
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${DEMO_SESSION_COOKIE}=${token}; Path=/; Max-Age=${DEMO_SESSION_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`;
-}
-
-export function clearedDemoSessionCookie(): string {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${DEMO_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
-}
-
-export function isDemoRequestAuthenticated(request: Request): boolean {
-  return demoSessionFromCookieHeader(request.headers.get("cookie")) !== null;
+export async function isDemoRequestAuthenticated(): Promise<boolean> {
+  return (await getDemoSession()) !== null;
 }
 
 export function unauthorizedResponse(): Response {
-  return Response.json({ error: { code: "UNAUTHENTICATED", message: "Sign in to use the demo workspace." } }, { status: 401 });
+  return Response.json({ error: { code: "UNAUTHENTICATED", message: "Sign in and complete email verification to use the owner workspace." } }, { status: 401 });
+}
+
+export function authNotConfiguredResponse(): Response {
+  const { missing } = getAuthReadiness();
+  return Response.json({ error: { code: "AUTH_NOT_CONFIGURED", message: `Authentication needs configuration: ${missing.join(", ")}.` } }, { status: 503 });
 }

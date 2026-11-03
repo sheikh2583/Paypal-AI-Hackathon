@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Inbox, LayoutDashboard, LoaderCircle, LogOut, ScrollText, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
 
 interface NavItem {
   href: string;
@@ -38,8 +39,8 @@ export function AppNav() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/logout", { method: "POST" });
-      if (!response.ok) throw new Error("Could not sign out. Please try again.");
+      const result = await authClient.signOut();
+      if (result.error) throw new Error("Could not sign out. Please try again.");
       router.replace("/login");
       router.refresh();
     } catch (cause) {

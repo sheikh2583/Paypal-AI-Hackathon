@@ -81,13 +81,15 @@ const paypalSchema = z
   });
 
 // ---------------------------------------------------------------------------
-// Single-owner demo authentication
+// Single-owner authentication and transactional email
 // ---------------------------------------------------------------------------
 
 const authSchema = z.object({
-  DEMO_LOGIN_EMAIL: z.preprocess(blankToUndefined, z.email().default("demo@chaser.test")),
-  DEMO_LOGIN_PASSWORD: z.preprocess(blankToUndefined, z.string().min(12).default("chaser-demo-2026")),
-  AUTH_SESSION_SECRET: z.preprocess(blankToUndefined, z.string().min(32).optional()),
+  AUTH_OWNER_EMAIL: z.preprocess(blankToUndefined, z.email().optional()),
+  BETTER_AUTH_URL: z.preprocess(blankToUndefined, z.url().default("http://localhost:3000")),
+  BETTER_AUTH_SECRET: z.preprocess(blankToUndefined, z.string().min(32).optional()),
+  RESEND_API_KEY: optionalString,
+  AUTH_EMAIL_FROM: optionalString,
 });
 
 /** Every variable the app reads. env.test.ts checks this against .env.example. */
@@ -208,17 +210,21 @@ export function getPayPalEnv(source: EnvSource = process.env): PayPalEnv {
   };
 }
 
-export interface DemoAuthEnv {
-  email: string;
-  password: string;
-  sessionSecret: string | undefined;
+export interface AuthEnv {
+  ownerEmail: string | undefined;
+  baseUrl: string;
+  secret: string | undefined;
+  resendApiKey: string | undefined;
+  emailFrom: string | undefined;
 }
 
-export function getDemoAuthEnv(source: EnvSource = process.env): DemoAuthEnv {
+export function getAuthEnv(source: EnvSource = process.env): AuthEnv {
   const e = parseGroup(authSchema, source);
   return {
-    email: e.DEMO_LOGIN_EMAIL.toLowerCase(),
-    password: e.DEMO_LOGIN_PASSWORD,
-    sessionSecret: e.AUTH_SESSION_SECRET,
+    ownerEmail: e.AUTH_OWNER_EMAIL?.toLowerCase(),
+    baseUrl: e.BETTER_AUTH_URL,
+    secret: e.BETTER_AUTH_SECRET,
+    resendApiKey: e.RESEND_API_KEY,
+    emailFrom: e.AUTH_EMAIL_FROM,
   };
 }

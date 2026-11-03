@@ -5,7 +5,7 @@ import {
   ENV_KEYS,
   EnvError,
   getAppEnv,
-  getDemoAuthEnv,
+  getAuthEnv,
   getLlmEnv,
   getPayPalEnv,
   SANDBOX_BASE_URL,
@@ -34,23 +34,20 @@ describe("getAppEnv", () => {
   });
 });
 
-describe("getDemoAuthEnv", () => {
-  it("provides public demo-only login credentials and keeps the session secret optional", () => {
-    expect(getDemoAuthEnv({})).toEqual({
-      email: "demo@chaser.test",
-      password: "chaser-demo-2026",
-      sessionSecret: undefined,
-    });
-    expect(getDemoAuthEnv({ DEMO_LOGIN_EMAIL: "OWNER@example.test", DEMO_LOGIN_PASSWORD: "a-long-demo-password" })).toMatchObject({
-      email: "owner@example.test",
-      password: "a-long-demo-password",
-    });
+describe("getAuthEnv", () => {
+  it("leaves single-owner auth unconfigured until private server settings are provided", () => {
+    expect(getAuthEnv({})).toEqual({ ownerEmail: undefined, baseUrl: "http://localhost:3000", secret: undefined, resendApiKey: undefined, emailFrom: undefined });
   });
 
-  it("requires valid email, a long enough demo password, and a strong configured secret", () => {
-    expect(() => getDemoAuthEnv({ DEMO_LOGIN_EMAIL: "not-an-email" })).toThrow(/DEMO_LOGIN_EMAIL/);
-    expect(() => getDemoAuthEnv({ DEMO_LOGIN_PASSWORD: "short" })).toThrow(/DEMO_LOGIN_PASSWORD/);
-    expect(() => getDemoAuthEnv({ AUTH_SESSION_SECRET: "short" })).toThrow(/AUTH_SESSION_SECRET/);
+  it("normalizes owner email and accepts a strong secret and verified sender settings", () => {
+    expect(getAuthEnv({ AUTH_OWNER_EMAIL: "OWNER@example.test", BETTER_AUTH_SECRET: "s".repeat(32), RESEND_API_KEY: "private", AUTH_EMAIL_FROM: "Chaser <no-reply@example.test>" })).toMatchObject({ ownerEmail: "owner@example.test", secret: "s".repeat(32) });
+  });
+
+  it("names invalid settings without revealing configured values", () => {
+    expect(() => getAuthEnv({ AUTH_OWNER_EMAIL: "not-an-email" })).toThrow(/AUTH_OWNER_EMAIL/);
+    expect(() => getAuthEnv({ BETTER_AUTH_SECRET: "short-secret-value" })).toThrow(/BETTER_AUTH_SECRET/);
+    expect(() => getAuthEnv({ BETTER_AUTH_SECRET: "secret-value-that-is-long-enough-000000" })).not.toThrow();
+    try { getAuthEnv({ BETTER_AUTH_SECRET: "short-secret-value" }); } catch (error) { expect(String(error)).not.toContain("short-secret-value"); }
   });
 });
 

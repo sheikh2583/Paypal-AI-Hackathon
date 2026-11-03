@@ -5,7 +5,7 @@ import { isDemoRequestAuthenticated, unauthorizedResponse } from '@/lib/auth';
 const requestSchema = z.object({ invoiceId: z.string().min(1) });
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDemoRequestAuthenticated(request)) return unauthorizedResponse();
+  if (!(await isDemoRequestAuthenticated())) return unauthorizedResponse();
   let raw: unknown;
   try {
     raw = await request.json();

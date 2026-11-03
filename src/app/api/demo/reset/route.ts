@@ -8,7 +8,7 @@ import { isDemoRequestAuthenticated, unauthorizedResponse } from '@/lib/auth';
 const inputSchema = z.object({}).strict();
 
 export async function POST(request: Request): Promise<Response> {
-  if (!isDemoRequestAuthenticated(request)) return unauthorizedResponse();
+  if (!(await isDemoRequestAuthenticated())) return unauthorizedResponse();
   let body: unknown;
   try { body = await request.json(); }
   catch { return Response.json({ error: { code: 'INVALID_JSON', message: 'Request body must be valid JSON.' } }, { status: 400 }); }
