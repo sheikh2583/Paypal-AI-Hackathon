@@ -118,11 +118,24 @@ let authSchemaReady: Promise<void> | undefined;
 /** Better Auth owns its auth tables and applies its migrations to the shared SQLite file. */
 export function ensureAuthSchema(): Promise<void> {
   authSchemaReady ??= auth.$context.then(async (context) => {
+    // CRITICAL: Repair rateLimit schema BEFORE runMigrations checks it.
+    // Better Auth 1.7+ expects rateLimit.id but older databases may lack it.
+    // Checking and adding the column before migration prevents schema mismatch errors.
+    const rateLimitExists = db.$client.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='rateLimit'"
+    ).get();
+    
+    if (rateLimitExists) {
+      ensureRateLimitIdColumn(
+        db.$client.pragma('table_info("rateLimit")') as Array<{ name: string }>,
+        () => db.$client.exec('ALTER TABLE "rateLimit" ADD COLUMN "id" TEXT'),
+      );
+    }
+    
+    // Now run migrations - the rateLimit table will have the expected schema
     await context.runMigrations();
-    ensureRateLimitIdColumn(
-      db.$client.pragma('table_info("rateLimit")') as Array<{ name: string }>,
-      () => db.$client.exec('ALTER TABLE "rateLimit" ADD COLUMN "id" TEXT'),
-    );
+    
+    // Create our custom auth token table
     ensureAuthTokenSchema(db.$client);
   });
   return authSchemaReady;

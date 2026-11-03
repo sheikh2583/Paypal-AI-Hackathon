@@ -5,11 +5,14 @@ services:
     region: oregon
     plan: free
     buildCommand: npx --yes pnpm@10.28.0 install --frozen-lockfile && npx pnpm@10.28.0 run build
+    # CRITICAL: auth:migrate must run before start to repair schema and run Better Auth migrations
     startCommand: npx pnpm@10.28.0 auth:migrate && npx pnpm@10.28.0 start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
+      # IMPORTANT: If using a persistent disk mounted at /app/data, this path will resolve correctly.
+      # Without a persistent disk, the database will be ephemeral and reset on every deploy.
       - key: DATABASE_PATH
         value: ./data/chaser.db
       - key: LLM_MODE

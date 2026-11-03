@@ -29,7 +29,10 @@ export function ensureAuthTokenSchema(database: SqliteTokenDb): void {
   )`);
 }
 
-/** Older local/deployed rate-limit tables may predate Better Auth's generated id column. */
+/**
+ * Older local/deployed rate-limit tables may predate Better Auth's generated id column.
+ * Better Auth 1.7+ requires the id column; this must run BEFORE context.runMigrations().
+ */
 export function ensureRateLimitIdColumn(columns: Array<{ name: string }>, addColumn: () => void): void {
   if (!columns.some((column) => column.name === "id")) {
     addColumn();
