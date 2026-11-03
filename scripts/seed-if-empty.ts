@@ -20,3 +20,4 @@ void main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : "Startup seed failed.");
   process.exitCode = 1;
 });
+
