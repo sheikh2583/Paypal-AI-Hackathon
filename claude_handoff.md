@@ -32,7 +32,7 @@
 | Database | SQLite via `better-sqlite3` 13.0.3 + Drizzle ORM 0.45.4 (file at `./data/chaser.db`) |
 | Validation | Zod 4.6.7 (v4 API — use `z.string()` not `z.string().min(1)` for nonempty etc.) |
 | Tests | Vitest 5.0.5 |
-| LLM | `@anthropic-ai/sdk` 1.3.0 tool-use loop, always behind `src/lib/llm.ts`. Model from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). `LLM_MODE=auto` = scripted when no API key, live mode otherwise |
+| LLM | Anthropic SDK or plain-fetch OpenAI-compatible chat completions behind `src/lib/llm.ts`. Configure compatible providers with `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`; `LLM_MODE=auto` uses scripted mode when the selected provider has no key |
 | PayPal | Direct REST fetch from `src/lib/paypal/`. `PAYPAL_MODE=mock` = fully fake. `PAYPAL_MODE=sandbox` = real Sandbox API |
 | Package manager | `pnpm` 10.28.0 |
 | Node | 22.23.4 |
@@ -530,7 +530,7 @@ Owner: **Maya Rahman**, business **Rahman Design Studio**. Policy: 30% min depos
 - **`db:push` "index already exists"** — known harmless warning; schema is already applied
 - **`better-sqlite3`**: ships prebuilt binaries, no `node-gyp` needed. Keep it in `serverExternalPackages` in `next.config.ts`
 - **Zod v4 API** — use v4 syntax (e.g. `z.object({}).strict()` not `.nonstrict()`)
-- **LLM_MODE=auto** — scripted canned responses when `ANTHROPIC_API_KEY` is empty; set the key for live agent behavior
+- **LLM_MODE=auto** — scripted canned responses when the selected provider has no API key; configure OpenAI-compatible services through `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`
 - **`PAYPAL_MODE=mock`** — safe default; `PAYPAL_MODE=sandbox` needs client id + secret + `PAYPAL_SANDBOX_BUYER_EMAIL`
 - **Plans above `autoApproveBelowCents`** — stored as `PENDING_APPROVAL`, client sees nothing until owner approves. On approval → plan becomes `OFFERED` → agent run sends it
 - **`rebasePlan` before `create_plan_invoices`** — shifts dates forward if deposit date has passed (advance-time demo case)
@@ -553,6 +553,11 @@ DEMO_NOW=                          # pin ISO date for repeatable demo
 # LLM
 ANTHROPIC_API_KEY=                 # leave empty for scripted/offline mode
 ANTHROPIC_MODEL=claude-sonnet-5-5
+LLM_PROVIDER=                      # blank = auto | anthropic | openai-compatible
+LLM_BASE_URL=                      # Gemini: https://generativelanguage.googleapis.com/v1beta/openai/
+LLM_API_KEY=                       # compatible provider key; do not commit
+LLM_MODEL=                         # Gemini: gemini-3.8-flash; Groq: openai/gpt-oss-20b
+LLM_MAX_HISTORY=20
 LLM_MODE=auto                      # auto | live | scripted
 
 # PayPal (Sandbox only)
@@ -577,4 +582,4 @@ Cross-area changes go through `docs/04-contracts.md` contracts or coordinated PR
 
 ---
 
-*Handoff updated Nov 3 2026 (prompt 05 — schema + seed aligned with docs/03 and docs/07, 226 tests). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
+*Handoff updated Nov 3 2026 (OpenAI-compatible LLM providers documented; last local suite: 268 passed, 1 skipped). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*

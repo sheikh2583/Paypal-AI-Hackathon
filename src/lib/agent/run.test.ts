@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestDb, closeTestDb } from '../db/test-utils';
 import type { AppDb } from '../db/client';
 import { getInvoice, getMessages, insertMessage, listApprovals, listAudit, listInvoicesByPlanId, updateInvoice } from '../db/queries';
@@ -6,7 +6,7 @@ import { seedDatabase } from '../db/seed';
 import { setClockDatabaseForTests, setClockOffset } from '../clock';
 import { MockPayPalClient } from '../paypal/mock';
 import type { LLM } from '../llm';
-import { ScriptedLLM } from '../llm';
+import { OpenAICompatibleLLM, ScriptedLLM } from '../llm';
 import { applyClassification } from './classify';
 import { runAgent, runDueAgents } from './run';
 import { buildSystemPrompt } from './prompt';
@@ -29,7 +29,6 @@ afterEach(() => {
   if (originalDemoNow === undefined) delete process.env.DEMO_NOW;
   else process.env.DEMO_NOW = originalDemoNow;
 });
-
 const noopLLM: LLM = {
   async runToolLoop() { return { summary: 'No action was needed.', toolCalls: [] }; },
   async structured<T>() { return { ok: true } as T; },
@@ -133,5 +132,44 @@ describe('agent runs', () => {
     expect(listApprovals('PENDING', database).some((approval) => approval.invoiceId === 'invoice-elena-2400' && approval.kind === 'PLAN_NEEDS_SIGNOFF')).toBe(true);
     const visibleMessages = getMessages('invoice-elena-2400', database).filter((message) => message.direction === 'agent_to_client').map((message) => message.body).join(' ');
     expect(visibleMessages).not.toMatch(/\$24\.00|\$840\.00|\$720\.00|installment 1/i);
+  });
+
+  it('falls back to scripted mode after a retryable first live-provider failure and audits it', async () => {
+    await seeded();
+    const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
+    Object.assign(process.env, { LLM_MODE: 'live', LLM_PROVIDER: 'openai-compatible', LLM_API_KEY: 'test-key', LLM_BASE_URL: 'https://provider.test/v1', LLM_MODEL: 'test-model' });
+    const fetchMock = vi.fn(async () => new Response('rate limited', { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const failing = new OpenAICompatibleLLM('https://provider.test/v1', 'test-key', 'test-model');
+    try {
+      const result = await runAgent('invoice-dana-900', 'manual', { database, llm: failing, paypal: new MockPayPalClient(database) });
+      expect(result.summary).toContain('scripted fallback');
+      expect(getMessages('invoice-dana-900', database).some((message) => message.direction === 'system' && message.body.includes('scripted fallback'))).toBe(true);
+      expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(listAudit('invoice-dana-900', database).some((entry) => entry.action === 'llm.fallback' && (entry.input as { provider?: string }).provider === 'openai-compatible')).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }
+    }
+  });
+
+  it('does not fall back after a side-effecting tool has run', async () => {
+    await seeded();
+    const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
+    Object.assign(process.env, { LLM_MODE: 'live', LLM_PROVIDER: 'openai-compatible', LLM_API_KEY: 'test-key', LLM_BASE_URL: 'https://provider.test/v1', LLM_MODEL: 'test-model' });
+    const failing: LLM = {
+      async structured<T>() { return {} as T; },
+      async runToolLoop(options) {
+        await options.onToolCall({ id: 'send', name: 'send_message', input: { invoiceId: 'invoice-dana-900', body: 'Reminder' } });
+        throw Object.assign(new Error('LLM_HTTP_503'), { status: 503 });
+      },
+    };
+    try {
+      await expect(runAgent('invoice-dana-900', 'manual', { database, llm: failing })).rejects.toThrow('LLM_HTTP_503');
+      expect(listAudit('invoice-dana-900', database).some((entry) => entry.action === 'llm.fallback')).toBe(false);
+      expect(getMessages('invoice-dana-900', database).some((message) => message.body === 'Reminder')).toBe(true);
+    } finally {
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }
+    }
   });
 });

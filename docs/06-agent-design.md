@@ -141,4 +141,14 @@ Each: seeded state + scripted client turns + assertions on DB state, tool calls 
 
 ## Cost and latency
 
-Use one model for the agent loop. Keep context small (last 20 messages). Cache risk explanations. Target < 15 s per agent step in the demo; use `LLM_MODE=scripted` as a fallback if the network or API is unreliable.
+Use one model for the agent loop. Keep context small (last `LLM_MAX_HISTORY` messages, default 20). Cache risk explanations. Target < 15 s per agent step in the demo. `LLM_MODE=auto` selects scripted mode when the chosen provider has no key; retryable live-provider failures may fall back to scripted mode only before a tool side effect.
+
+Provider settings: Anthropic uses `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`; OpenAI-compatible services use `LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. Tool definitions are emitted from the same Zod schemas that validate tool inputs. Structured results are JSON parsed and Zod validated; provider-specific strict structured output is not assumed.
+
+Current example presets (verify against provider model availability before a live demo):
+
+| Provider | `LLM_BASE_URL` | `LLM_MODEL` | Documented capabilities |
+|---|---|---|---|
+| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-3.8-flash` | OpenAI-compatible function calling and structured output are documented; compatibility remains beta. [Docs](https://ai.google.dev/gemini-api/docs/openai) |
+| Groq | `https://api.groq.com/openai/v1` | `openai/gpt-oss-20b` | Tool use/function calling and JSON schema mode are listed. Groq documents structured output and tool use as separate request modes. [Tool use](https://console.groq.com/docs/tool-use/overview) · [Structured outputs](https://console.groq.com/docs/structured-outputs) |
+| OpenRouter | `https://openrouter.ai/api/v1` | `openrouter/free` | Routes dynamically to an eligible free model; tool and structured-output support varies with the selected model. [API](https://openrouter.ai/docs/api-reference/overview) · [Free models](https://openrouter.ai/collections/free-models) |

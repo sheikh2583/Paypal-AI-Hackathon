@@ -18,7 +18,7 @@ One Next.js app (App Router) with server-side modules, a SQLite database, a PayP
  (LLM tool loop)  (allow/deny)  (real | mock)       SQLite
         │              ▲               ▲
         └── tools ─────┘───────────────┘
-        lib/llm.ts (Anthropic SDK; scripted mode)
+        lib/llm.ts (Anthropic SDK, OpenAI-compatible fetch adapter, scripted mode)
 ```
 
 ## Key design decisions
@@ -27,7 +27,7 @@ One Next.js app (App Router) with server-side modules, a SQLite database, a PayP
 2. **Risk is computed, not generated.** `lib/risk` computes a 0–100 score from features. The LLM only writes the human-readable explanation from those features.
 3. **PayPal behind an interface.** `lib/paypal/index.ts` exports a `PayPalClient` interface. `real.ts` talks to Sandbox; `mock.ts` simulates it in memory/DB. Selected by `PAYPAL_MODE`.
 4. **Events over polling where cheap.** A tiny in-process event bus + SSE endpoint pushes updates (new message, invoice paid, approval created) to the UI. Fall back to 2-second polling if SSE is a time sink.
-5. **LLM behind an interface.** `lib/llm.ts` wraps the Anthropic SDK tool-use loop. `LLM_MODE=scripted` replays canned responses for the demo scenario so a flaky network never kills a demo.
+5. **LLM behind an interface.** `lib/llm.ts` wraps the Anthropic SDK and a configurable OpenAI-compatible Chat Completions adapter. `LLM_MODE=scripted` replays canned responses; eligible transient live errors fall back only before a side-effecting tool runs.
 6. **Everything auditable.** A single `audit(event)` helper is called by every tool wrapper and every owner action.
 7. **Injection-safe by construction.** Client text is never concatenated into the system prompt. It is passed as a quoted data block in a user turn, and tool arguments are validated by Zod and then policy.
 

@@ -2,7 +2,8 @@ import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
 import { getClient, getInvoice, getMessages, getPolicy, insertMessage, listInvoices, updateInvoice } from '../db/queries';
 import { audit } from '../audit';
-import { getLLM, type LLM } from '../llm';
+import { getLLM, ScriptedLLM, isRetryableLlmError, type LLM } from '../llm';
+import { getLlmEnv } from '../env';
 import type { AgentRunResult, PayPalClient, RunOutcome, ToolCallRecord } from '../types';
 import { buildSystemPrompt, wrapClientMessage } from './prompt';
 import { agentTools, handleToolCall } from './tools';
@@ -33,6 +34,7 @@ export async function runAgent(
   const startedAt = getNow().toISOString();
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let fallbackUsed = false;
 
   try {
     const invoice = getInvoice(invoiceId, database);
@@ -70,6 +72,7 @@ export async function runAgent(
       };
     } else {
       let callsDispatched = 0;
+      let sideEffectRan = false;
       let rejectTimeout!: (reason: Error) => void;
       const timeoutPromise = new Promise<never>((_, reject) => { rejectTimeout = reject; });
       timer = setTimeout(() => {
@@ -92,21 +95,48 @@ export async function runAgent(
             audit({ actor: 'agent', action: 'agent.iteration_cap', invoiceId, input: { name }, result: { ok: false }, ok: false }, database);
             return JSON.stringify({ ok: false, error: 'ITERATION_LIMIT' });
           }
+          if (name !== 'get_invoice_context') sideEffectRan = true;
           return handleToolCall(name, input, database, getNow(), options.paypal);
         },
       });
-      result = await Promise.race([work, timeoutPromise]);
+      try {
+        result = await Promise.race([work, timeoutPromise]);
+      } catch (error) {
+        const llmEnv = getLlmEnv();
+        if (llmEnv.mode !== 'live' || sideEffectRan || !isRetryableLlmError(error)) throw error;
+        fallbackUsed = true;
+        const reason = error instanceof Error && /^LLM_(HTTP_\d+|TIMEOUT|NETWORK_ERROR)/.test(error.message)
+          ? error.message
+          : 'TRANSIENT_PROVIDER_ERROR';
+        audit({ actor: 'agent', action: 'llm.fallback', invoiceId, input: { provider: llmEnv.provider, reason }, result: { ok: true, fallback: 'scripted' }, ok: true }, database);
+        result = await new ScriptedLLM(client.persona ?? 'dana').runToolLoop({
+          system, messages: [{ role: 'user', content: JSON.stringify({ invoiceId, latestClientMessage: lastClientMessage ? wrapClientMessage(lastClientMessage.body) : null }) }],
+          tools: agentTools, maxIterations: MAX_TOOL_ITERATIONS, signal: controller.signal,
+          onToolCall: async ({ name, input }) => {
+            callsDispatched += 1;
+            if (callsDispatched > MAX_TOOL_ITERATIONS) {
+              audit({ actor: 'agent', action: 'agent.iteration_cap', invoiceId, input: { name }, result: { ok: false }, ok: false }, database);
+              return JSON.stringify({ ok: false, error: 'ITERATION_LIMIT' });
+            }
+            return handleToolCall(name, input, database, getNow(), options.paypal);
+          },
+        });
+      }
     }
 
     const finalState = outcomeFor(result.toolCalls);
-    const summary = oneSentence(result.summary, finalState);
+    const baseSummary = oneSentence(result.summary, finalState);
+    const summary = fallbackUsed
+      ? `${baseSummary.replace(/[.!?]$/, '')}; scripted fallback handled a live provider failure.`
+      : baseSummary;
     updateInvoice(invoiceId, { lastAgentRunAt: getNow().toISOString() }, database);
     insertMessage({ id: crypto.randomUUID(), invoiceId, direction: 'system', body: summary, createdAt: getNow().toISOString() }, database);
     await refreshRisk(invoiceId, database, getNow());
     audit({ actor: 'agent', action: 'agent_run', invoiceId, input: { runId, trigger, startedAt }, result: { finalState, summary }, ok: true }, database);
     return { runId, finalState, summary, toolCalls: result.toolCalls.slice(0, MAX_TOOL_ITERATIONS) };
   } catch (error) {
-    audit({ actor: 'agent', action: 'agent_run', invoiceId, input: { runId, trigger, startedAt }, result: { code: error instanceof Error ? error.message : 'AGENT_RUN_FAILED' }, ok: false }, database);
+    const code = error instanceof Error && /^[A-Z][A-Z0-9_]*$/.test(error.message) ? error.message : 'AGENT_RUN_FAILED';
+    audit({ actor: 'agent', action: 'agent_run', invoiceId, input: { runId, trigger, startedAt }, result: { code }, ok: false }, database);
     throw error;
   } finally {
     if (timer) clearTimeout(timer);

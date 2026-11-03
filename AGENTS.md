@@ -29,7 +29,7 @@ Full context lives in `docs/`. Read the relevant doc before changing an area:
 - SQLite via `better-sqlite3` + Drizzle ORM (file DB at `./data/chaser.db`)
 - Zod for validation (env, API inputs, tool inputs)
 - Vitest for tests
-- LLM via `@anthropic-ai/sdk` tool use, **always behind `src/lib/llm.ts`** so the provider can be swapped. Model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). `LLM_MODE=auto` (default) uses scripted mode when `ANTHROPIC_API_KEY` is empty and live mode otherwise.
+- LLM via `@anthropic-ai/sdk` or plain-fetch OpenAI-compatible chat completions, **always behind `src/lib/llm.ts`**. Configure compatible providers with `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`; Anthropic keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. `LLM_MODE=auto` (default) uses scripted mode when the selected provider has no key.
 - PayPal via direct REST calls (fetch) from `src/lib/paypal/` — Sandbox only. A `mock` mode exists so nobody is blocked on PayPal setup.
 - Package manager: `pnpm`
 

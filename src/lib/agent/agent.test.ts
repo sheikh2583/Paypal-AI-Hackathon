@@ -10,6 +10,7 @@ import { wrapClientMessage } from './prompt';
 import { handleToolCall } from './tools';
 import { ScriptedLLM } from '../llm';
 import { agentTools } from './tools';
+import { setClockDatabaseForTests } from '../clock';
 
 const now = new Date('2026-11-03T00:00:00.000Z');
 let database: AppDb;
@@ -17,13 +18,14 @@ let paypal: MockPayPalClient;
 
 function setup(amountCents = 90_000, paypalUrl: string | null = null) {
   database = createTestDb();
+  setClockDatabaseForTests(database);
   paypal = new MockPayPalClient(database);
   upsertPolicy({ minDepositPercent: 30, maxInstallments: 3, maxPlanDays: 90, maxDiscountPercent: 5, autoApproveBelowCents: 150_000, tone: 'friendly', businessName: 'Demo Studio', ownerName: 'Maya' }, database);
   database.insert(clients).values({ id: 'client-1', name: 'Dana Whitfield', email: 'dana@example.com', persona: 'dana', lateCount: 1, avgDaysLate: 8, responsiveness: 'high' }).run();
   database.insert(invoices).values({ id: 'invoice-1', paypalInvoiceUrl: paypalUrl, clientId: 'client-1', number: 'CH-001', description: 'Design work', amountCents, paidCents: 0, currency: 'USD', issuedAt: '2026-10-01T00:00:00.000Z', dueAt: '2026-10-11T00:00:00.000Z', status: 'OVERDUE', chaseState: 'NEW', riskFactorsJson: '[]' }).run();
 }
 
-afterEach(() => { if (database) closeTestDb(database); });
+afterEach(() => { if (database) closeTestDb(database); setClockDatabaseForTests(undefined); });
 
 describe('agent prompt and tools', () => {
   it('neutralizes fake client_message closing tags', () => {
