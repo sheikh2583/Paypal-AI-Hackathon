@@ -4,7 +4,7 @@ import { ArrowRight, CircleDollarSign, Clock3, ShieldCheck } from "lucide-react"
 import { PageHeader } from "@/components/page-header";
 import { DemoControls } from "@/components/demo-controls";
 import { db } from "@/lib/db/client";
-import { listApprovals, listInvoices, listPlansByInvoiceId } from "@/lib/db/queries";
+import { getMessages, listApprovals, listInvoices, listPlansByInvoiceId } from "@/lib/db/queries";
 import { getNow } from "@/lib/clock";
 import { nextAction } from "@/lib/agent/next-action";
 import { computeRisk, riskLabel } from "@/lib/risk";
@@ -24,6 +24,8 @@ export default function DashboardPage() {
   const total = openInvoices.reduce((sum, { invoice }) => sum + Math.max(0, invoice.amountCents - invoice.paidCents), 0);
   const dana = rows.find(({ invoice }) => invoice.id === "invoice-dana-900");
   const danaPlan = dana ? listPlansByInvoiceId(dana.invoice.id, db)[0] : undefined;
+  const danaMessages = dana ? getMessages(dana.invoice.id, db) : [];
+  const danaProgress: 0 | 1 | 2 | 3 = danaPlan?.status === "ACTIVE" ? 3 : danaPlan ? 2 : danaMessages.some((message) => message.direction === "agent_to_client") ? 1 : 0;
 
   return (
     <div className="space-y-7">
@@ -35,7 +37,7 @@ export default function DashboardPage() {
         <SummaryCard icon={ShieldCheck} label="Policy guardrails" value="Active" detail="30% deposit · max 3 installments · 5% discount" />
       </section>
 
-      <DemoControls invoiceId={dana?.invoice.id ?? "invoice-dana-900"} stepComplete={danaPlan?.status === "ACTIVE"} />
+      <DemoControls invoiceId={dana?.invoice.id ?? "invoice-dana-900"} progressStep={danaProgress} stepComplete={danaPlan?.status === "ACTIVE"} />
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b px-5 py-4">

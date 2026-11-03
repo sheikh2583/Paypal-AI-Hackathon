@@ -476,9 +476,9 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 | `GET/PUT /api/policy` | `OwnerPolicy` | `OwnerPolicy` |
 | `GET /api/audit?invoiceId=` | – | `AuditEntry[]` newest first |
 | `POST /api/webhooks/paypal` | PayPal event | `200` fast, idempotent |
-| `POST /api/demo/reset` | – | reseeds DB |
-| `POST /api/demo/simulate-payment` | `{invoiceId, amountCents?}` | local id → simulate payment |
-| `POST /api/demo/advance-time` | `{days}` | shifts `getNow()` |
+| `POST /api/demo/step` | `{invoiceId}` | advance one scripted Dana step; derives step from persisted conversation and plan |
+| `POST /api/demo/reset` | – | reseeds fictional demo data and clears demo activity |
+| `POST /api/mock-paypal/pay` | `{paypalInvoiceId}` | simulate a payment for a mock PayPal invoice |
 | `GET /api/events` | – | SSE stream `{type, invoiceId, at}` |
 
 **Error shape:** `{ error: { code: string, message: string } }` with appropriate HTTP status.
@@ -505,6 +505,12 @@ Owner: **Maya Rahman**, business **Rahman Design Studio**. Policy: 30% min depos
 - **Priya** ($600, 12d): requests 40% discount → `DISCOUNT_REQUEST` escalation → owner counters with 5%.
 - **Elena** ($2,400, 18d): plan exceeds auto-approve threshold → `PLAN_NEEDS_SIGNOFF` → owner approves → agent sends offer.
 - **Tom** ($350, 6d): short gentle nudge; $350 is below `MIN_PLAN_REMAINING_CENTS` threshold if he requests a plan.
+
+### Current presenter flow
+
+The Dashboard's “Walk through Dana’s payment plan” panel is a three-step guided scenario: send the reminder; add Dana's scripted request and show a policy-checked offer; simulate acceptance and create the installment invoices in PayPal mock mode. The progress indicator and button text follow the persisted messages and plan status. Open Dana's invoice to review the conversation and payment schedule, then click “Simulate $270 deposit payment” to complete the mock payment segment. “Reset demo” restores the fictional seed scenario and clears the demo activity after a confirmation.
+
+This flow uses `ScriptedLLM` and the mock PayPal API even if live providers are configured. It requires no credentials, sends no real client messages, and does not move real money. For a presentation, explain which behavior is deterministic/simulated while showing that the policy checks, plan state, invoice records, and audit trail are real application state.
 
 ---
 
@@ -582,4 +588,4 @@ Cross-area changes go through `docs/04-contracts.md` contracts or coordinated PR
 
 ---
 
-*Handoff updated Nov 3 2026 (OpenAI-compatible LLM providers documented; last local suite: 268 passed, 1 skipped). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
+*Handoff updated Nov 3 2026 (OpenAI-compatible LLM providers and guided demo walkthrough documented; last recorded local suite: 268 passed, 1 skipped). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*

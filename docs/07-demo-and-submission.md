@@ -28,25 +28,32 @@ Elena's plan exceeds the auto-approve threshold, so her journey demonstrates the
 
 ## 3-minute demo script
 
-**0:00–0:20 — The problem.** "Maya is a freelancer. She has $5,500 in overdue invoices and no time to chase them." Dashboard shows 5 invoices ranked by risk with reasons.
+**0:00–0:20 — The problem.** "Maya is a freelancer. She has $5,500 in overdue invoices and no time to chase them." Dashboard shows five seeded invoices, risk levels, chase state, and the next suggested action.
 
 **0:20–0:45 — Guardrails.** Open Policy: "Maya sets the limits once. The agent can never exceed them." Show min deposit, installments, discount cap.
 
-**0:45–1:30 — Negotiation (Dana).** Run Chaser on Dana's invoice: agent sends a friendly reminder. Simulated reply: "Sorry, things are tight this month. Can I split this?" Agent proposes $270 now (30%) + $315 + $315 over 60 days. Dana: "That works!" Agent confirms.
+**0:45–1:30 — Negotiation (Dana).** Use the guided Dana panel and advance its three steps: send the reminder; add Dana's scripted “Can I split this?” reply and get a policy-checked offer; then simulate her acceptance and issue three mock installment invoices. The plan is $270 now (30%) + $315 + $315. Open Dana's invoice to show the conversation, plan schedule, and audit trail.
 
-**1:30–2:10 — PayPal.** Chaser creates and sends the three installment invoices via PayPal. Open the PayPal invoice page for the deposit, pay it (Sandbox buyer), and watch the dashboard update live: deposit marked paid, plan active.
+**1:30–2:10 — PayPal.** In the default mock mode, select “Simulate $270 deposit payment” on Dana's invoice. Show the deposit change to paid and the installment plan remain active. This is a deterministic mock payment, not a real PayPal transaction. If presenting a separately configured Sandbox run, use the PayPal Sandbox invoice page and buyer account instead.
 
 **2:10–2:40 — Safety (Priya).** Priya demands a 40% discount. Agent does not promise anything and escalates (`DISCOUNT_REQUEST`). In the Approvals inbox Maya declines the 40% and sends a 5% goodwill counter instead (within policy, but her call); Chaser relays it to Priya.
 
 **2:40–3:00 — Trust.** Open the Audit log: every tool call and policy decision with timestamps. Close with the one-line value prop and "Built with PayPal Invoicing and Claude."
 
-Backup path for every step: mock mode + scripted LLM mode, same UI.
+Backup path for the full walkthrough: `PAYPAL_MODE=mock` and scripted LLM mode, same UI; no provider or PayPal credentials are required.
 
-**Current guided UI:** the Dashboard lists live seeded invoice state and includes “Run next Dana step.” Use it once for the reminder, again for Dana's scripted split-payment reply and policy-checked proposal, and a third time for her acceptance and mock PayPal installment invoices. On Dana's invoice detail, “Simulate deposit payment” pays the first mock installment and refreshes the invoice state. Reset demo restores the fictional seed scenario after a presentation. The guided sequence uses `ScriptedLLM`, so it works without any provider key and does not send real client messages or real payments.
+### Presenter setup and click path
+
+1. Start the app with `pnpm dev` and open the Dashboard. It shows the five fictional overdue invoices, risk levels, current chase states, and next actions. Use the Policy page to explain the owner's boundaries.
+2. In “Walk through Dana’s payment plan,” the three highlighted stages show progress. Click the stage-specific button once per step; the latest action and any scripted client reply appear below it. The plan numbers are generated under policy and should be explained as a $270 deposit plus two $315 installments.
+3. Open Dana's invoice to show the conversation and installment schedule. Click the clearly labelled mock deposit payment button to finish the payment segment. Use “Reset demo” after the presentation to restore the fictional seed state and clear the accumulated demo activity.
+
+The guided sequence uses `ScriptedLLM` regardless of provider configuration, and the deposit control uses the mock PayPal API. It needs no provider key and sends no real client messages or payments. The panel labels the scripted and simulated parts so the presenter can distinguish them from the policy and audit behavior being demonstrated.
 
 ## Demo mode checklist (Person C)
 
-- One-click "Reset demo" (reseeds, clears audit)
+- Guided Dana steps with visible progress and contextual action labels
+- One-click "Reset demo" (reseeds fictional data and clears demo activity; confirmation required)
 - "Advance time" control to make invoices overdue on cue
 - "Simulate payment" button as a fallback to the PayPal page
 - Presenter-friendly UI: large type, no dev chrome, dark/light OK, no scrollbars in the main flow
