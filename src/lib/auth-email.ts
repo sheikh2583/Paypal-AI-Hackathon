@@ -1,4 +1,5 @@
 import { getAuthEnv, type AuthEnv } from "@/lib/env";
+import { Resend } from "resend";
 
 export interface AuthEmail {
   to: string;
@@ -25,33 +26,30 @@ export function authEmailHtml(email: AuthEmail): string {
 }
 
 export async function sendAuthEmail(message: AuthEmail, config: AuthEnv = getAuthEnv()): Promise<void> {
-  if (!config.resendApiKey || !config.emailFrom) {
-    throw new Error("Email delivery is not configured (RESEND_API_KEY and AUTH_EMAIL_FROM are required).");
+  if (!config.resendApiKey || !config.resendFrom) {
+    throw new Error("Email delivery is not configured (RESEND_API_KEY and RESEND_FROM are required).");
   }
 
-  let response: Response;
+  let actionUrl: URL;
   try {
-    response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${config.resendApiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        from: config.emailFrom,
-        to: [message.to],
-        subject: message.subject,
-        html: authEmailHtml(message),
-        text: `${message.heading}\n\n${message.message}\n\n${message.actionLabel}: ${message.actionUrl}\n\nIf you did not request this, ignore this message.`,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    actionUrl = new URL(message.actionUrl);
+    if (actionUrl.origin !== new URL(config.baseUrl).origin) throw new Error();
   } catch {
-    throw new Error("Authentication email delivery failed before the provider responded.");
+    throw new Error("Authentication email link must use the configured application origin.");
   }
 
-  if (!response.ok) {
-    // Do not include provider response bodies: they can contain addresses or account details.
-    throw new Error(`Authentication email provider returned HTTP ${response.status}.`);
+  const resend = new Resend(config.resendApiKey);
+  try {
+    const { error } = await resend.emails.send({
+      from: config.resendFrom,
+      to: [message.to],
+      subject: message.subject,
+      html: authEmailHtml({ ...message, actionUrl: actionUrl.toString() }),
+      text: `${message.heading}\n\n${message.message}\n\n${message.actionLabel}: ${actionUrl.toString()}\n\nIf you did not request this, ignore this message.`,
+    });
+    if (error) throw new Error("provider rejected the email request");
+  } catch {
+    // Deliberately discard SDK errors; they may contain addresses or provider details.
+    throw new Error("Authentication email provider rejected the request.");
   }
 }

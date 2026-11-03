@@ -88,7 +88,7 @@ prompts/
 1. `/setup` creates the one owner account only when the database has no user and the submitted email matches `AUTH_OWNER_EMAIL`; the app closes registration after that first account.
 2. Better Auth stores password hashes and sessions in the same SQLite database. It sends email verification and password-reset links through Resend; passwords require at least 14 characters and reset revokes existing sessions.
 3. Email OTP is enabled for the owner during account creation. Sign-in requires password and a one-time code; only a verified, OTP-enabled owner session can access the workspace.
-4. `/api/auth/[...all]` provides the Better Auth endpoints. The `(app)` layout, mutation routes and mock invoice page independently verify the owner session. Cookies are HttpOnly and SameSite=Lax, with Secure on HTTPS. Configure `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_OWNER_EMAIL`, `RESEND_API_KEY`, and a verified `AUTH_EMAIL_FROM`; no public demo credentials exist.
+4. `/api/auth/[...all]` provides the Better Auth endpoints. The `(app)` layout, mutation routes and mock invoice page independently verify the owner session. Cookies are HttpOnly and SameSite=Lax, with Secure on HTTPS. Configure `BETTER_AUTH_SECRET`, `AUTH_OWNER_EMAIL`, `RESEND_API_KEY`, and `RESEND_FROM`; Better Auth uses `APP_BASE_URL` for email links. Verification tokens are stored as hashes for one-time use; Better Auth reset token identifiers are hashed before storage, and email OTP values use a server-secret HMAC, five-minute lifetime, bounded attempts, and persistent rate limits.
 
 ### A. Agent run on an overdue invoice
 1. Owner clicks "Run Chaser" (or a scheduled demo trigger).

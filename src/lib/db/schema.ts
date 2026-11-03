@@ -204,6 +204,12 @@ export const kv = sqliteTable("kv", {
   value: text("value").notNull(),
 });
 
+/** Used only to enforce one-time email-verification links; tokens are SHA-256 digests. */
+export const authEmailVerificationTokens = sqliteTable("auth_email_verification_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  expiresAt: text("expires_at").notNull(),
+});
+
 export const schema = {
   ownerPolicy,
   clients,
@@ -215,4 +221,5 @@ export const schema = {
   webhookEvents,
   mockPaypalInvoices,
   kv,
+  authEmailVerificationTokens,
 };

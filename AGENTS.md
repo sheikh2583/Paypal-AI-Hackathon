@@ -31,7 +31,7 @@ Full context lives in `docs/`. Read the relevant doc before changing an area:
 - Vitest for tests
 - LLM via `@anthropic-ai/sdk` or plain-fetch OpenAI-compatible chat completions, **always behind `src/lib/llm.ts`**. Configure compatible providers with `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`; Anthropic keeps `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`. `LLM_MODE=auto` (default) uses scripted mode when the selected provider has no key.
 - PayPal via direct REST calls (fetch) from `src/lib/paypal/` — Sandbox only. A `mock` mode exists so nobody is blocked on PayPal setup.
-- Single-owner authentication uses Better Auth sessions, email verification, password reset and email OTP; only `AUTH_OWNER_EMAIL` may register, and there are no public demo credentials.
+- Single-owner authentication uses Better Auth sessions, Resend emails, verification, password reset and hashed email OTP; only `AUTH_OWNER_EMAIL` may register, and there are no public demo credentials. Configure `RESEND_API_KEY` and `RESEND_FROM` server-side.
 - Package manager: `pnpm`
 
 Check current official docs for any library before using it; do not rely on memory for APIs or versions.

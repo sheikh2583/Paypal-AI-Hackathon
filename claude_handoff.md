@@ -510,7 +510,7 @@ Owner: **Maya Rahman**, business **Rahman Design Studio**. Policy: 30% min depos
 
 ### Current presenter flow
 
-Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` (random, at least 32 characters), `RESEND_API_KEY`, and `AUTH_EMAIL_FROM` (verified sender). Create the one owner at `/setup`, verify the email link, then sign in using the password and emailed OTP. The session lasts seven days. There are no public demo credentials. Reset Demo opens an accessible in-app confirmation dialog rather than a browser popup.
+Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET` (random, at least 32 characters), `RESEND_API_KEY`, and `RESEND_FROM`; `APP_BASE_URL` supplies public links. Create the one owner at `/setup`, verify the email link, then sign in using the password and emailed OTP. The session lasts seven days. There are no public demo credentials. Reset Demo opens an accessible in-app confirmation dialog rather than a browser popup.
 
 The Dashboard's “Walk through Dana’s payment plan” panel is a three-step guided scenario: send the reminder; add Dana's scripted request and show a policy-checked offer; simulate acceptance and create the installment invoices in PayPal mock mode. The progress indicator and button text follow the persisted messages and plan status. Open Dana's invoice to review the conversation and payment schedule, then click “Simulate $270 deposit payment” to complete the mock payment segment. “Reset demo” restores the fictional seed scenario and clears the demo activity after confirmation.
 
@@ -560,10 +560,9 @@ APP_BASE_URL=http://localhost:3000
 DATABASE_PATH=./data/chaser.db
 DEMO_NOW=                          # pin ISO date for repeatable demo
 AUTH_OWNER_EMAIL=                  # the sole account allowed to register
-BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_SECRET=                # private random value (>=32 chars)
 RESEND_API_KEY=                    # provider secret; never commit
-AUTH_EMAIL_FROM=                   # verified sender, e.g. Chaser <no-reply@your-domain.example>
+RESEND_FROM=PayPal Hackathon <onboarding@resend.dev> # testing sender, restricted recipient
 
 # LLM
 ANTHROPIC_API_KEY=                 # leave empty for scripted/offline mode

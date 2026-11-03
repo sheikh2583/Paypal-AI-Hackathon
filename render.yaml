@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     buildCommand: npx --yes pnpm@10.28.0 install --frozen-lockfile && npx pnpm@10.28.0 run build
-    startCommand: npx pnpm@10.28.0 db:push; npx pnpm@10.28.0 db:seed; npx pnpm@10.28.0 start
+    startCommand: npx pnpm@10.28.0 db:push && npx pnpm@10.28.0 auth:migrate && npx pnpm@10.28.0 db:seed && npx pnpm@10.28.0 start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
@@ -18,6 +18,14 @@ services:
         value: mock
       - key: APP_BASE_URL
         value: https://paypal-ai-hackathon-9tkr.onrender.com
+      - key: AUTH_OWNER_EMAIL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: "PayPal Hackathon <onboarding@resend.dev>"
       - key: ANTHROPIC_API_KEY
         sync: false
 

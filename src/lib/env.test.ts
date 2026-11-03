@@ -36,11 +36,11 @@ describe("getAppEnv", () => {
 
 describe("getAuthEnv", () => {
   it("leaves single-owner auth unconfigured until private server settings are provided", () => {
-    expect(getAuthEnv({})).toEqual({ ownerEmail: undefined, baseUrl: "http://localhost:3000", secret: undefined, resendApiKey: undefined, emailFrom: undefined });
+    expect(getAuthEnv({})).toEqual({ ownerEmail: undefined, baseUrl: "http://localhost:3000", secret: undefined, resendApiKey: undefined, resendFrom: undefined });
   });
 
   it("normalizes owner email and accepts a strong secret and verified sender settings", () => {
-    expect(getAuthEnv({ AUTH_OWNER_EMAIL: "OWNER@example.test", BETTER_AUTH_SECRET: "s".repeat(32), RESEND_API_KEY: "private", AUTH_EMAIL_FROM: "Chaser <no-reply@example.test>" })).toMatchObject({ ownerEmail: "owner@example.test", secret: "s".repeat(32) });
+    expect(getAuthEnv({ APP_BASE_URL: "https://chaser.example.test", AUTH_OWNER_EMAIL: "OWNER@example.test", BETTER_AUTH_SECRET: "s".repeat(32), RESEND_API_KEY: "private", RESEND_FROM: "Chaser <no-reply@example.test>" })).toMatchObject({ ownerEmail: "owner@example.test", baseUrl: "https://chaser.example.test", secret: "s".repeat(32), resendFrom: "Chaser <no-reply@example.test>" });
   });
 
   it("names invalid settings without revealing configured values", () => {

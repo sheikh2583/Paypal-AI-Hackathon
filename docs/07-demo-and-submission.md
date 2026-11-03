@@ -44,14 +44,14 @@ Backup path for the full walkthrough: `PAYPAL_MODE=mock` and scripted LLM mode, 
 
 ### Presenter setup and click path
 
-1. Configure `AUTH_OWNER_EMAIL`, `BETTER_AUTH_URL`, a private `BETTER_AUTH_SECRET` (at least 32 characters), `RESEND_API_KEY`, and a verified Resend sender in `AUTH_EMAIL_FROM`. Start with `pnpm dev`, open `/setup`, create the one owner account, verify the email link, then sign in with the password and emailed OTP. No public demo credentials are provided.
+1. Configure `AUTH_OWNER_EMAIL`, a private `BETTER_AUTH_SECRET` (at least 32 characters), `RESEND_API_KEY`, and `RESEND_FROM`. `APP_BASE_URL` is used to create email links. Start with `pnpm dev`, open `/setup`, create the one owner account, verify the email link, then sign in with the password and emailed OTP. No public demo credentials are provided.
 2. The Dashboard shows the five fictional overdue invoices, risk levels, current chase states, and next actions. Use the Policy page to explain the owner's boundaries.
 3. In “Walk through Dana’s payment plan,” the three highlighted stages show progress. Click the stage-specific button once per step; the latest action and any scripted client reply appear below it. The plan numbers are generated under policy and should be explained as a $270 deposit plus two $315 installments.
 4. Open Dana's invoice to show the conversation and installment schedule. Click the clearly labelled mock deposit payment button to finish the payment segment. Use “Reset demo” after the presentation to open the in-app confirmation dialog, restore the fictional seed state, and clear the accumulated demo activity.
 
 The guided sequence uses `ScriptedLLM` regardless of provider configuration, and the deposit control uses the mock PayPal API. It needs no provider key and sends no real client messages or payments. The panel labels the scripted and simulated parts so the presenter can distinguish them from the policy and audit behavior being demonstrated.
 
-The owner authentication uses Better Auth sessions stored in SQLite. Protect `BETTER_AUTH_SECRET` and `RESEND_API_KEY` as deployment secrets; set `BETTER_AUTH_URL` to the public app origin and `AUTH_EMAIL_FROM` to a verified sender. Password reset is available from the sign-in page. Client messaging and PayPal remain simulated in the guided demo.
+The owner authentication uses Better Auth sessions stored in SQLite. Protect `BETTER_AUTH_SECRET` and `RESEND_API_KEY` as deployment secrets. `onboarding@resend.dev` is a testing sender and is restricted to Resend's eligible test recipient; it does not enable mail to arbitrary users. Real-user delivery requires a domain you own and verify with Resend, then setting `RESEND_FROM` to that verified sender. Password reset is available from the sign-in page. Client messaging and PayPal remain simulated in the guided demo.
 
 ## Demo mode checklist (Person C)
 

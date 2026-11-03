@@ -13,6 +13,7 @@
     "llm:smoke": "tsx --env-file-if-exists=.env.local src/lib/llm-smoke.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file-if-exists=.env.local src/lib/db/seed.ts",
+    "auth:migrate": "tsx --env-file-if-exists=.env.local scripts/auth-migrate.ts",
     "paypal:smoke": "tsx --env-file-if-exists=.env.local src/lib/paypal/smoke.ts"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "resend": "^6.37.0",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
   },

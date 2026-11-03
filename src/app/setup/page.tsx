@@ -8,5 +8,6 @@ export const dynamic = "force-dynamic";
 
 export default async function SetupPage() {
   if (await getOwnerAccountExists()) redirect("/login");
-  return <OwnerSetupForm configured={getAuthReadiness().ready} />;
+  const readiness = getAuthReadiness();
+  return <OwnerSetupForm configured={readiness.ready} testingSender={readiness.testingSender} />;
 }

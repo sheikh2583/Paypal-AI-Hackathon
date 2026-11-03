@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CircleDollarSign, LoaderCircle, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigured: boolean; ownerAccountExists: boolean }) {
+export function LoginForm({ authConfigured, ownerAccountExists, testingSender, emailVerified }: { authConfigured: boolean; ownerAccountExists: boolean; testingSender: boolean; emailVerified: boolean }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +15,7 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [verificationPending, setVerificationPending] = useState(false);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,6 +25,7 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
     try {
       const result = await authClient.signIn.email({ email, password });
       if (result.error) {
+        setVerificationPending(result.error.status === 403);
         setError(result.error.status === 403
           ? "Verify your email using the link we sent before signing in."
           : "That email or password could not be verified.");
@@ -31,7 +33,7 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
       }
       if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect === true) {
         setStep("otp");
-        setNotice("A one-time code was sent to your verified email address.");
+        setNotice("Code request processed. Check the eligible inbox; if no code arrives, the testing sender may not allow that recipient.");
         const sent = await authClient.twoFactor.sendOtp({ trustDevice: false });
         if (sent.error) throw new Error("We could not send your sign-in code. Try again shortly.");
         return;
@@ -40,6 +42,21 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Sign in could not be completed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendVerification() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await authClient.sendVerificationEmail({ email, callbackURL: "/login?verified=1" });
+      if (result.error) throw new Error("The request could not be completed. Check Resend settings and recipient eligibility.");
+      setNotice("Verification request accepted. Check the eligible inbox; delivery depends on Resend sender permissions.");
+      setVerificationPending(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The verification request could not be completed.");
     } finally {
       setBusy(false);
     }
@@ -71,7 +88,7 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
     try {
       const result = await authClient.twoFactor.sendOtp({ trustDevice: false });
       if (result.error) throw new Error("We could not send a new code. Try again shortly.");
-      setNotice("A new one-time code was sent. Older codes no longer work.");
+      setNotice("New code request processed. Check the eligible inbox; older codes are replaced.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "We could not send a new code.");
     } finally {
@@ -93,7 +110,9 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
           <div className="mb-8 lg:hidden"><span className="inline-flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><CircleDollarSign className="size-6" /></span><p className="mt-3 text-lg font-semibold">Chaser</p></div>
           <div className="mb-8"><p className="text-sm font-medium text-primary">Owner workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">{step === "otp" ? "Check your email" : "Sign in securely"}</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step === "otp" ? `Enter the one-time code sent to ${email}.` : "Use your owner account to review invoices, approvals, and agent activity."}</p></div>
 
-          {!authConfigured ? <div role="status" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">Authentication is not enabled yet. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `AUTH_EMAIL_FROM` in the server environment.</div> : null}
+          {!authConfigured ? <div role="status" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">Authentication is not enabled yet. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM` in the server environment.</div> : null}
+          {testingSender ? <div role="note" className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-950">Resend is using its testing sender. Email delivery is restricted to the eligible Resend test recipient; arbitrary-user delivery is not enabled.</div> : null}
+          {emailVerified ? <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Email verified. Sign in with your password to continue.</p> : null}
           {step === "password" && !ownerAccountExists && authConfigured ? <div className="mb-5 rounded-xl border bg-secondary/50 p-4 text-sm text-muted-foreground">No owner account exists yet. <Link href="/setup" className="font-semibold text-primary hover:underline">Set up the owner account</Link>.</div> : null}
 
           {step === "password" ? <form onSubmit={(event) => void signIn(event)} className="space-y-4">
@@ -107,6 +126,7 @@ export function LoginForm({ authConfigured, ownerAccountExists }: { authConfigur
           </form>}
 
           {step === "password" && error ? <p role="alert" className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">{error}</p> : null}
+          {step === "password" && verificationPending ? <button type="button" disabled={busy || !email} onClick={() => void resendVerification()} className="mt-3 w-full rounded-xl border px-4 py-2.5 text-sm font-medium hover:bg-secondary disabled:opacity-60">{busy ? "Requesting…" : "Resend verification email"}</button> : null}
           {notice && step === "password" ? <p role="status" className="mt-4 text-sm text-emerald-700">{notice}</p> : null}
           <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">Passwords must be at least 14 characters. Email verification and a one-time code are required. No public demo password is enabled.</p>
         </div>

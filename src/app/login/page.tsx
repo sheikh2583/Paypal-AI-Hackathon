@@ -6,8 +6,9 @@ import { getAuthReadiness, getDemoSession, getOwnerAccountExists } from "@/lib/a
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ verified?: string }> }) {
   if (await getDemoSession()) redirect("/");
   const [ownerAccountExists] = await Promise.all([getOwnerAccountExists()]);
-  return <LoginForm authConfigured={getAuthReadiness().ready} ownerAccountExists={ownerAccountExists} />;
+  const readiness = getAuthReadiness();
+  return <LoginForm authConfigured={readiness.ready} ownerAccountExists={ownerAccountExists} testingSender={readiness.testingSender} emailVerified={(await searchParams).verified === "1"} />;
 }

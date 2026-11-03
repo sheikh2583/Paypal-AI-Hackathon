@@ -86,10 +86,9 @@ const paypalSchema = z
 
 const authSchema = z.object({
   AUTH_OWNER_EMAIL: z.preprocess(blankToUndefined, z.email().optional()),
-  BETTER_AUTH_URL: z.preprocess(blankToUndefined, z.url().default("http://localhost:3000")),
   BETTER_AUTH_SECRET: z.preprocess(blankToUndefined, z.string().min(32).optional()),
   RESEND_API_KEY: optionalString,
-  AUTH_EMAIL_FROM: optionalString,
+  RESEND_FROM: optionalString,
 });
 
 /** Every variable the app reads. env.test.ts checks this against .env.example. */
@@ -215,16 +214,17 @@ export interface AuthEnv {
   baseUrl: string;
   secret: string | undefined;
   resendApiKey: string | undefined;
-  emailFrom: string | undefined;
+  resendFrom: string | undefined;
 }
 
 export function getAuthEnv(source: EnvSource = process.env): AuthEnv {
   const e = parseGroup(authSchema, source);
+  const app = getAppEnv(source);
   return {
     ownerEmail: e.AUTH_OWNER_EMAIL?.toLowerCase(),
-    baseUrl: e.BETTER_AUTH_URL,
+    baseUrl: app.appBaseUrl,
     secret: e.BETTER_AUTH_SECRET,
     resendApiKey: e.RESEND_API_KEY,
-    emailFrom: e.AUTH_EMAIL_FROM,
+    resendFrom: e.RESEND_FROM,
   };
 }
