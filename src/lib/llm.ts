@@ -4,6 +4,7 @@ import type { ToolCallRecord } from './types';
 import { getLlmEnv } from './env';
 import type Anthropic from '@anthropic-ai/sdk';
 import { getNow } from './clock';
+import { toJSONSchema as zodToJsonSchema } from 'zod';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -22,9 +23,13 @@ export interface ToolCallRequest {
 }
 
 export interface LlmMessage {
-  role: 'user' | 'assistant';
-  content: string | Array<{ type: string; [k: string]: unknown }>;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content?: string | Array<{ type: string; [k: string]: unknown }> | null;
+  tool_call_id?: string;
+  tool_calls?: OpenAiToolCall[];
 }
+
+interface OpenAiToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 
 export interface RunToolLoopOptions {
   system: string;
@@ -48,6 +53,101 @@ export interface LLM {
   structured<T>(opts: StructuredOptions<T>): Promise<T>;
 }
 
+/** Plain-fetch OpenAI Chat Completions adapter. Provider errors deliberately omit response bodies. */
+export class OpenAICompatibleLLM implements LLM {
+  constructor(private readonly baseUrl: string, private readonly apiKey: string, private readonly model: string, private readonly timeoutMs = 10_000) {}
+
+  private async request(body: Record<string, unknown>, outerSignal?: AbortSignal): Promise<Record<string, unknown>> {
+    let last: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${this.apiKey}` },
+          body: JSON.stringify({ model: this.model, ...body }),
+          signal: outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal,
+        });
+        if (!response.ok) {
+          const error = new LlmRequestError(`LLM_HTTP_${response.status}`, response.status);
+          if (attempt === 0 && retryableStatus(response.status)) { last = error; await new Promise((resolve) => setTimeout(resolve, 350)); continue; }
+          throw error;
+        }
+        return await response.json() as Record<string, unknown>;
+      } catch (error) {
+        const safe = error instanceof LlmRequestError ? error : new LlmRequestError(controller.signal.aborted || outerSignal?.aborted ? 'LLM_TIMEOUT' : 'LLM_NETWORK_ERROR');
+        last = safe;
+        if (attempt === 1 || !isRetryableLlmError(safe)) throw safe;
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      } finally { clearTimeout(timeout); }
+    }
+    throw last instanceof Error ? last : new LlmRequestError('LLM_REQUEST_FAILED');
+  }
+
+  async runToolLoop(opts: RunToolLoopOptions): Promise<{ summary: string; toolCalls: ToolCallRecord[] }> {
+    const messages: LlmMessage[] = [{ role: 'system', content: opts.system }, ...opts.messages.slice(-getLlmEnv().maxHistory)];
+    const tools = opts.tools.map((tool) => ({ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } }));
+    const toolCalls: ToolCallRecord[] = [];
+    for (let iteration = 0; iteration < opts.maxIterations; iteration++) {
+      if (opts.signal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
+      const data = await this.request({ messages, tools, ...(opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {}) }, opts.signal);
+      const choices = data.choices as Array<{ message?: { content?: string | null; tool_calls?: OpenAiToolCall[] } }> | undefined;
+      const message = choices?.[0]?.message;
+      if (!message?.tool_calls?.length) return { summary: message?.content ?? '', toolCalls };
+      messages.push({ role: 'assistant', content: message.content, tool_calls: message.tool_calls });
+      for (const call of message.tool_calls) {
+        let input: unknown;
+        let result: string;
+        let ok = true;
+        try {
+          input = JSON.parse(call.function.arguments) as unknown;
+          result = await opts.onToolCall({ id: call.id, name: call.function.name, input });
+        } catch {
+          input = input ?? {};
+          result = JSON.stringify({ ok: false, error: 'INVALID_TOOL_ARGUMENTS' });
+          ok = false;
+        }
+        toolCalls.push({ tool: call.function.name, input, ok, result: safeParse(result), at: getNow().toISOString() });
+        messages.push({ role: 'tool', tool_call_id: call.id, content: result });
+      }
+    }
+    return { summary: 'Tool iteration limit reached.', toolCalls };
+  }
+
+  async structured<T>(opts: StructuredOptions<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const data = await this.request({
+          messages: [{ role: 'system', content: `${opts.system}\nReturn only JSON matching this schema: ${JSON.stringify(zodJsonSchema(opts.schema))}` }, { role: 'user', content: opts.input }],
+          response_format: { type: 'json_object' },
+        });
+        const choices = data.choices as Array<{ message?: { content?: string | null } }> | undefined;
+        return opts.schema.parse(JSON.parse(choices?.[0]?.message?.content ?? ''));
+      } catch (error) {
+        lastError = error;
+        if (isRetryableLlmError(error) || attempt === 1) throw sanitizeLlmError(error);
+      }
+    }
+    throw sanitizeLlmError(lastError);
+  }
+}
+
+export class LlmRequestError extends Error {
+  constructor(public readonly code: string, public readonly status?: number) { super(code); this.name = 'LlmRequestError'; }
+}
+function retryableStatus(status: number): boolean { return status === 429 || status >= 500; }
+export function isRetryableLlmError(error: unknown): boolean {
+  if (error instanceof LlmRequestError) return error.code === 'LLM_TIMEOUT' || error.code === 'LLM_NETWORK_ERROR' || error.status === 429 || (error.status ?? 0) >= 500;
+  const status = typeof error === 'object' && error !== null ? Number((error as { status?: unknown }).status) : 0;
+  return status === 429 || status >= 500 || (error instanceof Error && ['AbortError', 'TimeoutError', 'APIConnectionError'].includes(error.name));
+}
+function sanitizeLlmError(error: unknown): Error { return error instanceof LlmRequestError ? error : new LlmRequestError('LLM_INVALID_RESPONSE'); }
+function safeParse(value: string): unknown { try { return JSON.parse(value) as unknown; } catch { return value; } }
+function zodJsonSchema(schema: import('zod').ZodType): unknown {
+  try { return zodToJsonSchema(schema); } catch { return {}; }
+}
 // ---------------------------------------------------------------------------
 // AnthropicLLM — live implementation
 // ---------------------------------------------------------------------------
@@ -76,12 +176,7 @@ class AnthropicLLM implements LLM {
         return await fn(outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal);
       } catch (err: unknown) {
         clearTimeout(timeout);
-        const isRetryable =
-          err instanceof Error &&
-          err.name === 'AbortError' ||
-          ((err as { status?: number }).status != null &&
-            ((err as { status?: number }).status ?? 0) >= 500);
-        if (attempt === 1 || !isRetryable) throw err;
+        if (attempt === 1 || !isRetryableLlmError(err)) throw err;
         // one retry
         await new Promise((r) => setTimeout(r, 500));
       } finally {
@@ -333,7 +428,8 @@ export class ScriptedLLM implements LLM {
 export function getLLM(persona = 'dana'): LLM {
   const env = getLlmEnv();
   if (env.mode === 'live') {
-    if (!env.apiKey) throw new Error('ANTHROPIC_API_KEY is required for live LLM mode');
+    if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEY'} is required for live LLM mode`);
+    if (env.provider === 'openai-compatible') return new OpenAICompatibleLLM(env.baseUrl!, env.apiKey, env.model);
     return new AnthropicLLM(env.apiKey, env.model);
   }
   const existing = scriptedInstances.get(persona);
@@ -345,7 +441,8 @@ export function getLLM(persona = 'dana'): LLM {
 
 export function createLiveLLM(): LLM {
   const env = getLlmEnv();
-  if (!env.apiKey) throw new Error('ANTHROPIC_API_KEY is required for live LLM mode');
+  if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEY'} is required for live LLM mode`);
+  if (env.provider === 'openai-compatible') return new OpenAICompatibleLLM(env.baseUrl!, env.apiKey, env.model);
   return new AnthropicLLM(env.apiKey, env.model);
 }
 

@@ -32,6 +32,7 @@ import {
   updatePlan,
 } from '../db/queries';
 import type { ToolDefinition } from '../llm';
+import { getLlmEnv } from '../env';
 
 // ---------------------------------------------------------------------------
 // Helpers: functions not yet in queries.ts
@@ -78,7 +79,7 @@ function countUnansweredNudges(invoiceId: string, database: AppDb): number {
 const GET_INVOICE_CONTEXT_DEF: ToolDefinition = {
   name: 'get_invoice_context',
   description:
-    'Returns full context for an invoice: invoice details, client info, policy summary, risk score, and last 20 messages. Always call this first before taking any action.',
+    'Returns invoice, client, policy, risk, and recent message context. Call first before taking action.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -230,6 +231,18 @@ const scheduleFollowupSchema = z.object({
   inDays: z.number().int().min(1).max(14),
 });
 
+// Keep provider function declarations derived from the same schemas used to
+// validate tool inputs, so weaker models cannot gain a looser interface.
+const generatedSchemas: Record<string, z.ZodType> = {
+  get_invoice_context: getInvoiceContextSchema,
+  send_message: sendMessageSchema,
+  propose_payment_plan: proposePlanSchema,
+  create_plan_invoices: createPlanInvoicesSchema,
+  escalate_to_owner: escalateSchema,
+  schedule_followup: scheduleFollowupSchema,
+};
+for (const tool of agentTools) tool.inputSchema = z.toJSONSchema(generatedSchemas[tool.name]!);
+
 // ---------------------------------------------------------------------------
 // Tool handlers
 // ---------------------------------------------------------------------------
@@ -246,7 +259,7 @@ async function handleGetInvoiceContext(
   }
   const client = getClient(invoice.clientId, database);
   const policy = getPolicy(database);
-  const msgs = getMessages(invoice.id, database).slice(-20);
+  const msgs = getMessages(invoice.id, database).slice(-getLlmEnv().maxHistory);
   const unansweredNudges = countUnansweredNudges(invoice.id, database);
   const overdue = daysOverdue(invoice.dueAt, now);
 

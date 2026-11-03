@@ -38,6 +38,11 @@ const appSchema = z.object({
 const llmSchema = z.object({
   ANTHROPIC_API_KEY: optionalString,
   ANTHROPIC_MODEL: z.preprocess(blankToUndefined, z.string().default("claude-sonnet-5-5")),
+  LLM_PROVIDER: z.preprocess(blankToUndefined, z.enum(["anthropic", "openai-compatible"]).optional()),
+  LLM_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
+  LLM_API_KEY: optionalString,
+  LLM_MODEL: z.preprocess(blankToUndefined, z.string().optional()),
+  LLM_MAX_HISTORY: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(100).default(20)),
   LLM_MODE: z.preprocess(blankToUndefined, z.enum(["auto", "live", "scripted"]).default("auto")),
 });
 
@@ -129,8 +134,11 @@ export function getAppEnv(source: EnvSource = process.env): AppEnv {
 export type ResolvedLlmMode = "live" | "scripted";
 
 export interface LlmEnv {
+  provider: "anthropic" | "openai-compatible";
+  baseUrl: string | undefined;
   apiKey: string | undefined;
   model: string;
+  maxHistory: number;
   /** What was configured: auto | live | scripted. */
   configuredMode: "auto" | "live" | "scripted";
   /** What will actually run. auto → scripted without an API key, live with one. */
@@ -139,17 +147,28 @@ export interface LlmEnv {
 
 export function getLlmEnv(source: EnvSource = process.env): LlmEnv {
   const e = parseGroup(llmSchema, source);
-  const hasKey = Boolean(e.ANTHROPIC_API_KEY);
+  const provider = e.LLM_PROVIDER ?? (e.LLM_API_KEY ? "openai-compatible" : "anthropic");
+  const apiKey = provider === "anthropic" ? e.ANTHROPIC_API_KEY : e.LLM_API_KEY;
+  const hasKey = Boolean(apiKey);
   if (e.LLM_MODE === "live" && !hasKey) {
     throw new EnvError([
-      { key: "ANTHROPIC_API_KEY", message: "required when LLM_MODE=live" },
+      { key: provider === "anthropic" ? "ANTHROPIC_API_KEY" : "LLM_API_KEY", message: "required when LLM_MODE=live" },
     ]);
   }
   const mode: ResolvedLlmMode =
     e.LLM_MODE === "auto" ? (hasKey ? "live" : "scripted") : e.LLM_MODE;
+  if (mode === "live" && provider === "openai-compatible" && !e.LLM_BASE_URL) {
+    throw new EnvError([{ key: "LLM_BASE_URL", message: "required for openai-compatible provider" }]);
+  }
+  if (mode === "live" && provider === "openai-compatible" && !e.LLM_MODEL) {
+    throw new EnvError([{ key: "LLM_MODEL", message: "required for openai-compatible provider" }]);
+  }
   return {
-    apiKey: e.ANTHROPIC_API_KEY,
-    model: e.ANTHROPIC_MODEL,
+    provider,
+    baseUrl: e.LLM_BASE_URL,
+    apiKey,
+    model: provider === "anthropic" ? e.ANTHROPIC_MODEL : (e.LLM_MODEL ?? ""),
+    maxHistory: e.LLM_MAX_HISTORY,
     configuredMode: e.LLM_MODE,
     mode,
   };

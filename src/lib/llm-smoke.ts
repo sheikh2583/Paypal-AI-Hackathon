@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
 async function main(): Promise<void> {
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  const selectedProvider = process.env.LLM_PROVIDER?.trim() || (process.env.LLM_API_KEY?.trim() ? 'openai-compatible' : 'anthropic');
+  const selectedKey = selectedProvider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.LLM_API_KEY;
+  if (!selectedKey?.trim()) {
     console.log('no key, skipped');
     return;
   }
   try {
+    const { getLlmEnv } = await import('./env');
+    const config = getLlmEnv();
     const { createLiveLLM } = await import('./llm');
     const { listInvoices } = await import('./db/queries');
     const { agentTools, handleToolCall } = await import('./agent/tools');
@@ -34,7 +38,7 @@ async function main(): Promise<void> {
     if (loop.toolCalls.length !== 1 || loop.toolCalls[0]?.tool !== 'get_invoice_context' || !loop.toolCalls[0]?.ok) {
       throw new Error('The read-only tool loop did not complete successfully.');
     }
-    console.log(JSON.stringify({ structured: { ok: true }, toolLoop: { ok: true, tool: 'get_invoice_context', toolCallCount: loop.toolCalls.length } }));
+    console.log(JSON.stringify({ provider: config.provider, model: config.model, structured: { ok: true }, toolLoop: { ok: true, tool: 'get_invoice_context', toolCallCount: loop.toolCalls.length } }));
   } catch {
     console.error(JSON.stringify({ error: 'LLM smoke failed; details redacted.' }));
     process.exitCode = 1;

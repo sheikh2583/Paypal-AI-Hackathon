@@ -47,6 +47,21 @@ describe("getLlmEnv", () => {
     expect(getLlmEnv({ ANTHROPIC_API_KEY: "k" }).mode).toBe("live");
   });
 
+  it("keeps the Anthropic provider and configured model as the default path", () => {
+    expect(getLlmEnv({ ANTHROPIC_API_KEY: "k", ANTHROPIC_MODEL: "existing-model" })).toMatchObject({ provider: "anthropic", mode: "live", model: "existing-model" });
+  });
+
+  it("selects OpenAI-compatible mode when configured or when it is the only key", () => {
+    expect(getLlmEnv({ LLM_API_KEY: "k", LLM_BASE_URL: "https://example.test/v1", LLM_MODEL: "model" })).toMatchObject({ provider: "openai-compatible", mode: "live", model: "model" });
+    expect(getLlmEnv({ LLM_PROVIDER: "openai-compatible", LLM_API_KEY: "k", LLM_BASE_URL: "https://example.test/v1", LLM_MODEL: "model" }).provider).toBe("openai-compatible");
+    expect(getLlmEnv({ LLM_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "a", LLM_API_KEY: "k" }).provider).toBe("anthropic");
+  });
+
+  it("uses scripted mode when no selected provider key exists and names missing config keys", () => {
+    expect(getLlmEnv({ LLM_PROVIDER: "openai-compatible", ANTHROPIC_API_KEY: "a" }).mode).toBe("scripted");
+    expect(() => getLlmEnv({ LLM_MODE: "live", LLM_PROVIDER: "openai-compatible", LLM_API_KEY: "secret" })).toThrow(/LLM_BASE_URL/);
+  });
+
   it("explicit modes override auto", () => {
     expect(getLlmEnv({ ANTHROPIC_API_KEY: "k", LLM_MODE: "scripted" }).mode).toBe("scripted");
     expect(getLlmEnv({ LLM_MODE: "scripted" }).mode).toBe("scripted");
