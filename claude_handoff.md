@@ -27,21 +27,22 @@ Runtime versions are pinned in `package.json`/`pnpm-lock.yaml` (Next 16.4.3, Bet
 - `pnpm auth:migrate` runs Better Auth's SQLite migrations and additive auth-support schema setup. `drizzle.config.ts` uses a table allowlist so `db:push` does not try to rename Better Auth-owned core tables. A tested additive repair adds a missing nullable `rateLimit.id` column without dropping existing counters.
 - The auth implementation is not yet fully production-hardened: `src/lib/auth.ts` currently generates a random fallback secret when `BETTER_AUTH_SECRET` is missing. Production must fail closed instead of using a per-process fallback. `getAuthReadiness()` does require the configured secret before allowing auth use, but the underlying Better Auth instance still receives the fallback. Review and test this carefully.
 
-## Critical deployment findings to handle next
+## Production database safety status
 
-These are known from source inspection, not assumptions about current Render disk state:
+The urgent production data-safety fix is being prepared on branch `codex/production-startup-data-safety`. No production database or Render settings have been changed.
 
-1. **Production startup runs the destructive demo seed.** `render.yaml` currently has `db:push && auth:migrate && db:seed && start`. `src/lib/db/seed.ts` deletes all rows from messages, approvals, audit logs, webhook events, mock PayPal invoices, plans, invoices, clients, owner policy, and KV before reseeding. Remove `db:seed` from normal production startup; keep demo seeding an explicit/manual operation. Do not run it against production.
-2. **Persistence is unverified and no disk is declared in `render.yaml`.** `DATABASE_PATH` is `./data/chaser.db`. Determine whether the deployed service has persistent storage from Render configuration/dashboard or current official Render docs; do not infer that the local file survives restarts. If persistence is absent, propose a safe configuration and get approval before changing production resources.
-3. **Migrations must remain additive.** Keep the Drizzle table filter and inspect every migration against existing tables/data. Do not use `--force`, destructive push, database reset, or production seed. If a migration could drop/rebuild records, stop and ask.
-4. **Production auth configuration.** Expected names: `APP_BASE_URL`, `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET` (stable, random, at least 32 characters), `RESEND_API_KEY`, `RESEND_FROM`. The deployment base URL is `https://paypal-ai-hackathon-9tkr.onrender.com`. Do not print secret values. Validate the production secret is mandatory and stable. The Render blueprint currently declares `RESEND_FROM` as `PayPal Hackathon <onboarding@resend.dev>`; this testing sender is restricted. No custom domain is owned, so do not claim general email delivery works.
-5. **Deployment is not approved.** Prepare local changes and report manual Render steps; do not deploy or mutate production.
+1. **Startup change:** in this branch `render.yaml` is changed to run only `auth:migrate` and `start`; it no longer invokes `db:push` or `db:seed`. The explicit `pnpm db:seed` command remains available for demo setup. A regression test checks both conditions.
+2. **Seed behavior:** `src/lib/db/seed.ts` deletes rows from messages, approvals, audit logs, webhook events, mock PayPal invoices, plans, invoices, clients, owner policy, and KV before reseeding. Never run it against production.
+3. **Persistence:** the Render blueprint says `plan: free`, declares no disk, and sets `DATABASE_PATH=./data/chaser.db`. Current Render docs say Free web services cannot attach persistent disks and have ephemeral filesystems; therefore this configuration does not provide durable SQLite storage. Durable storage needs a paid service with a persistent disk mounted at an absolute path that matches the resolved DB path, or a managed database. Any Render plan/resource change is a manual owner action.
+4. **Migrations:** `db:push` remains for local development only. There is no checked-in Drizzle migration history for business tables. Use versioned, reviewed migrations for future production schema changes, after establishing a safe baseline for the existing deployed DB. Do not guess a baseline or apply migrations to production as part of this task. Better Auth's `auth:migrate` remains in startup and should continue to be reviewed for additive behavior.
+5. **Production auth configuration:** expected names are `APP_BASE_URL`, `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET` (stable, random, at least 32 characters), `RESEND_API_KEY`, `RESEND_FROM`. The deployment base URL is `https://paypal-ai-hackathon-9tkr.onrender.com`. Never print secret values. Make the production secret mandatory and stable. `onboarding@resend.dev` is a restricted test sender; no custom domain is owned.
+6. **Deployment is not approved.** Do not deploy, alter Render resources, or mutate production data.
 
 Last safe live probe (an empty POST to sign-in; it could not send email) returned HTTP 503 with the old message naming `AUTH_EMAIL_FROM`. That indicates the public service was still serving the old auth build at that time. No real Resend delivery has been tested. Recheck only with non-destructive requests after the owner deploys.
 
 ## Latest local validation
 
-At commit `1f05643`, these passed:
+At commit `1f05643`, before this follow-up, these passed:
 
 - `pnpm db:push` — no local changes detected; non-interactive.
 - `pnpm auth:migrate` — Better Auth schema ready.
@@ -50,14 +51,14 @@ At commit `1f05643`, these passed:
 - `pnpm test` — 281 passed, 1 skipped (282 total).
 - `pnpm build` — successful, no Better Auth schema warnings after local additive migration.
 
-These do not verify live email delivery, Render persistent storage, or production deploy behavior. Do not run `pnpm db:seed` against production.
+Rerun checks after the deployment-safety change. Passing local checks does not verify live email delivery, Render storage, or production deploy behavior. Do not run `pnpm db:seed` against production.
 
 ## Useful paths
 
 - Auth: `src/lib/auth.ts`, `src/lib/auth-email.ts`, `src/lib/auth-tokens.ts`, `src/app/api/auth/[...all]/route.ts`, auth pages/components under `src/app/` and `src/components/`.
 - Env: `src/lib/env.ts`, `.env.example`.
 - DB: `src/lib/db/client.ts`, `schema.ts`, `queries.ts`, `seed.ts`, `seed.test.ts`; Drizzle config: `drizzle.config.ts`.
-- Deployment: `render.yaml`, package scripts in `package.json`.
+- Deployment: `render.yaml`, package scripts in `package.json`, regression test `src/lib/deployment.test.ts`.
 - Constraints/decisions: `AGENTS.md`, `docs/DECISIONS.md`, `docs/02-architecture.md`, `docs/03-data-model.md`, `docs/04-contracts.md`, `docs/07-demo-and-submission.md`.
 - Full security task: `PRODUCTION_SECURITY_TASK.md` in the Claude Web share ZIP.
 
@@ -72,4 +73,4 @@ pnpm test
 pnpm build
 ```
 
-Inspect `git diff --check`, `git diff`, and `git status` before committing. The current branch is `main`; make small, focused commits. Never include `.env.local`, `data/*.db`, `node_modules`, `.next`, provider keys, session tokens, or production database contents in a share archive or commit.
+Inspect `git diff --check`, `git diff`, and `git status` before committing. The current branch is `codex/production-startup-data-safety`; make small, focused commits. Never include `.env.local`, `data/*.db`, `node_modules`, `.next`, provider keys, session tokens, or production database contents in a share archive or commit.
