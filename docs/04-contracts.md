@@ -209,8 +209,12 @@ Not tools (the LLM cannot do these): changing policy, marking an invoice paid, c
 
 ## HTTP API (route handlers) — Person C consumes, A/B implement
 
+All owner pages, mock invoice pages, and mutation APIs require the signed single-owner demo session except `POST /api/auth/login`, `POST /api/auth/logout`, and PayPal webhooks. The demo credentials are intentionally public and only gate the fictional demo workspace.
+
 | method + path | body | returns |
 |---|---|---|
+| `POST /api/auth/login` | `{email, password}` | `{ok:true}` and sets the HttpOnly demo session cookie |
+| `POST /api/auth/logout` | – | `{ok:true}` and clears the demo session cookie |
 | `GET /api/invoices` | – | `InvoiceListItem[]` (with client, risk, chaseState, nextAction) |
 | `GET /api/invoices/:id` | – | invoice + messages + plan + approvals |
 | `POST /api/agent/run` | `{invoiceId}` | `AgentRunResult` |
@@ -222,9 +226,7 @@ Not tools (the LLM cannot do these): changing policy, marking an invoice paid, c
 | `GET/PUT /api/policy` | `OwnerPolicy` | `OwnerPolicy` |
 | `GET /api/audit?invoiceId=` | – | `AuditEntry[]` newest first |
 | `POST /api/webhooks/paypal` | PayPal event | `200` fast; idempotent |
-| `POST /api/demo/reset` | – | reseeds DB |
-| `POST /api/demo/simulate-payment` | `{invoiceId, amountCents?}` | `invoiceId` is the **local** id; resolves its PayPal id and uses the same function as `/api/mock-paypal/pay` (mock). In sandbox mode returns 409 explaining the invoice must be paid on PayPal's page, but still runs the reconciler |
-| `POST /api/demo/advance-time` | `{days}` | shifts `getNow()` so invoices become overdue |
-| `GET /api/events` | – | SSE stream of `{type, invoiceId, at}` |
+| `POST /api/demo/step` | `{invoiceId}` | advance one persisted scripted Dana step |
+| `POST /api/demo/reset` | `{}` | mock mode only: reseeds fictional demo data |
 
 Error shape for all routes: `{ error: { code: string, message: string } }` with an appropriate HTTP status.

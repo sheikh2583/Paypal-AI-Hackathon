@@ -5,6 +5,7 @@ import {
   ENV_KEYS,
   EnvError,
   getAppEnv,
+  getDemoAuthEnv,
   getLlmEnv,
   getPayPalEnv,
   SANDBOX_BASE_URL,
@@ -30,6 +31,26 @@ describe("getAppEnv", () => {
   it("accepts a pinned DEMO_NOW and rejects garbage", () => {
     expect(getAppEnv({ DEMO_NOW: "2026-11-02" }).demoNow).toBe("2026-11-02");
     expect(() => getAppEnv({ DEMO_NOW: "next tuesday" })).toThrow(EnvError);
+  });
+});
+
+describe("getDemoAuthEnv", () => {
+  it("provides public demo-only login credentials and keeps the session secret optional", () => {
+    expect(getDemoAuthEnv({})).toEqual({
+      email: "demo@chaser.test",
+      password: "chaser-demo-2026",
+      sessionSecret: undefined,
+    });
+    expect(getDemoAuthEnv({ DEMO_LOGIN_EMAIL: "OWNER@example.test", DEMO_LOGIN_PASSWORD: "a-long-demo-password" })).toMatchObject({
+      email: "owner@example.test",
+      password: "a-long-demo-password",
+    });
+  });
+
+  it("requires valid email, a long enough demo password, and a strong configured secret", () => {
+    expect(() => getDemoAuthEnv({ DEMO_LOGIN_EMAIL: "not-an-email" })).toThrow(/DEMO_LOGIN_EMAIL/);
+    expect(() => getDemoAuthEnv({ DEMO_LOGIN_PASSWORD: "short" })).toThrow(/DEMO_LOGIN_PASSWORD/);
+    expect(() => getDemoAuthEnv({ AUTH_SESSION_SECRET: "short" })).toThrow(/AUTH_SESSION_SECRET/);
   });
 });
 

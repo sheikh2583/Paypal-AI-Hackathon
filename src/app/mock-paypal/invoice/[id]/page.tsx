@@ -6,6 +6,8 @@ import { formatCents } from "@/lib/money";
 import { db } from "@/lib/db/client";
 import { getMockPaypalInvoice } from "@/lib/db/queries";
 import MockPayNowButton from "./mock-pay-now-button";
+import { getDemoSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Mock Invoice — Chaser" };
 
@@ -14,6 +16,7 @@ export default async function MockPayPalInvoicePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await getDemoSession())) redirect("/login");
   const { id } = await params;
   const invoice = getMockPaypalInvoice(id, db);
 

@@ -10,7 +10,7 @@ One Next.js app (App Router) with server-side modules, a SQLite database, a PayP
 └───────────────┬─────────────────────────────────────────────────────────┘
                 │ fetch / SSE (or polling)
 ┌───────────────▼───────────── Next.js route handlers ─────────────────────┐
-│ /api/agent/run   /api/sim/client-reply   /api/approvals/*   /api/policy   │
+│ /api/auth/*   /api/agent/run   /api/approvals/*   /api/policy            │
 │ /api/webhooks/paypal   /api/demo/*   /api/events (SSE)                    │
 └───────┬──────────────┬───────────────┬───────────────┬───────────────────┘
         │              │               │               │
@@ -83,6 +83,13 @@ prompts/
 
 ## Request flows
 
+### 0. Single-owner demo login
+
+1. `/login` displays the public demo-only credentials and a button that fills them into the form.
+2. `POST /api/auth/login` validates the credentials and sets a seven-day, signed `HttpOnly`, `SameSite=Lax` cookie (`Secure` in production). The signing secret is `AUTH_SESSION_SECRET`, or a process-generated random secret when unset.
+3. The `(app)` layout redirects unsigned sessions to `/login`; state-changing API routes and the mock invoice page independently verify the same session. `POST /api/auth/logout` expires the cookie.
+4. This is a single shared demo-owner gate for fictional data, not production identity management. Set a shared `AUTH_SESSION_SECRET` in multi-instance deployments so sessions validate consistently.
+
 ### A. Agent run on an overdue invoice
 1. Owner clicks "Run Chaser" (or a scheduled demo trigger).
 2. `POST /api/agent/run {invoiceId}` → `agent/run.ts` builds context (invoice, client history, conversation, policy summary, risk).
@@ -103,5 +110,5 @@ prompts/
 
 - **Performance:** single-user demo; no caching needed. Agent run target < 15 s per step.
 - **Resilience:** all PayPal calls have timeouts, idempotency keys (`PayPal-Request-Id`) and retries on 5xx only. Webhook handler is idempotent (dedupe by event id).
-- **Security:** Sandbox only; verify webhook signatures in sandbox mode; never expose server env to the client; sanitize rendered message text.
+- **Security:** Sandbox only; verify webhook signatures in sandbox mode; never expose server env to the client; sanitize rendered message text. Protect owner pages and mutation APIs with the signed demo session; only the login endpoints and PayPal webhooks are public.
 - **Testing pyramid:** unit tests for policy/risk/plan math/money; contract tests for PayPal mock vs real shapes; agent evals (scenarios) for behavior; one Playwright-style smoke test is optional.

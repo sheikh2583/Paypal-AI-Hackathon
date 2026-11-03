@@ -173,6 +173,7 @@ src/
     money.ts                      # cents helpers
     audit.ts
     events.ts                     # event bus
+    auth.ts                       # signed single-owner demo session cookie
     llm.ts                        # Anthropic wrapper (stub)
     utils.ts                      # cn() etc
     db/
@@ -465,6 +466,8 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 
 | Method + Path | Body | Returns |
 |---|---|---|
+| `POST /api/auth/login` | `{email, password}` | sets the signed HttpOnly demo session cookie |
+| `POST /api/auth/logout` | – | expires the demo session cookie |
 | `GET /api/invoices` | – | `InvoiceListItem[]` |
 | `GET /api/invoices/:id` | – | invoice + messages + plan + approvals |
 | `POST /api/agent/run` | `{invoiceId}` | `AgentRunResult` |
@@ -478,10 +481,10 @@ Each tool: Zod-validated input → policy check (where money involved) → effec
 | `POST /api/webhooks/paypal` | PayPal event | `200` fast, idempotent |
 | `POST /api/demo/step` | `{invoiceId}` | advance one scripted Dana step; derives step from persisted conversation and plan |
 | `POST /api/demo/reset` | – | reseeds fictional demo data and clears demo activity |
-| `POST /api/mock-paypal/pay` | `{paypalInvoiceId}` | simulate a payment for a mock PayPal invoice |
 | `GET /api/events` | – | SSE stream `{type, invoiceId, at}` |
 
 **Error shape:** `{ error: { code: string, message: string } }` with appropriate HTTP status.
+Owner pages, the mock invoice page, and mutation APIs require the single-owner session; only login/logout and PayPal webhooks are public.
 
 ---
 
@@ -508,7 +511,9 @@ Owner: **Maya Rahman**, business **Rahman Design Studio**. Policy: 30% min depos
 
 ### Current presenter flow
 
-The Dashboard's “Walk through Dana’s payment plan” panel is a three-step guided scenario: send the reminder; add Dana's scripted request and show a policy-checked offer; simulate acceptance and create the installment invoices in PayPal mock mode. The progress indicator and button text follow the persisted messages and plan status. Open Dana's invoice to review the conversation and payment schedule, then click “Simulate $270 deposit payment” to complete the mock payment segment. “Reset demo” restores the fictional seed scenario and clears the demo activity after a confirmation.
+Sign in at `/login` by clicking the “Try the demo account” credential card to fill the demo email and password. Defaults are `demo@chaser.test` / `chaser-demo-2026`; the sign-in session lasts seven days. Reset Demo opens an accessible in-app confirmation dialog rather than a browser popup.
+
+The Dashboard's “Walk through Dana’s payment plan” panel is a three-step guided scenario: send the reminder; add Dana's scripted request and show a policy-checked offer; simulate acceptance and create the installment invoices in PayPal mock mode. The progress indicator and button text follow the persisted messages and plan status. Open Dana's invoice to review the conversation and payment schedule, then click “Simulate $270 deposit payment” to complete the mock payment segment. “Reset demo” restores the fictional seed scenario and clears the demo activity after confirmation.
 
 This flow uses `ScriptedLLM` and the mock PayPal API even if live providers are configured. It requires no credentials, sends no real client messages, and does not move real money. For a presentation, explain which behavior is deterministic/simulated while showing that the policy checks, plan state, invoice records, and audit trail are real application state.
 
@@ -555,6 +560,9 @@ This flow uses `ScriptedLLM` and the mock PayPal API even if live providers are 
 APP_BASE_URL=http://localhost:3000
 DATABASE_PATH=./data/chaser.db
 DEMO_NOW=                          # pin ISO date for repeatable demo
+DEMO_LOGIN_EMAIL=demo@chaser.test  # public demo-only workspace credential
+DEMO_LOGIN_PASSWORD=chaser-demo-2026
+AUTH_SESSION_SECRET=               # set shared random value (>=32 chars) for multi-instance deploys
 
 # LLM
 ANTHROPIC_API_KEY=                 # leave empty for scripted/offline mode
@@ -588,4 +596,4 @@ Cross-area changes go through `docs/04-contracts.md` contracts or coordinated PR
 
 ---
 
-*Handoff updated Nov 3 2026 (OpenAI-compatible LLM providers and guided demo walkthrough documented; last recorded local suite: 268 passed, 1 skipped). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*
+*Handoff updated Nov 3 2026 (OpenAI-compatible LLM providers, guided demo, and single-owner demo login documented; latest local suite: 274 passed, 1 skipped). Repo: https://github.com/sheikh2583/Paypal-AI-Hackathon | Live: https://paypal-ai-hackathon-9tkr.onrender.com*

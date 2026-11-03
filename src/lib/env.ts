@@ -80,11 +80,22 @@ const paypalSchema = z
     }
   });
 
+// ---------------------------------------------------------------------------
+// Single-owner demo authentication
+// ---------------------------------------------------------------------------
+
+const authSchema = z.object({
+  DEMO_LOGIN_EMAIL: z.preprocess(blankToUndefined, z.email().default("demo@chaser.test")),
+  DEMO_LOGIN_PASSWORD: z.preprocess(blankToUndefined, z.string().min(12).default("chaser-demo-2026")),
+  AUTH_SESSION_SECRET: z.preprocess(blankToUndefined, z.string().min(32).optional()),
+});
+
 /** Every variable the app reads. env.test.ts checks this against .env.example. */
 export const ENV_KEYS: readonly string[] = [
   ...Object.keys(appSchema.shape),
   ...Object.keys(llmSchema.shape),
   ...Object.keys(paypalSchema.shape),
+  ...Object.keys(authSchema.shape),
 ];
 
 // ---------------------------------------------------------------------------
@@ -194,5 +205,20 @@ export function getPayPalEnv(source: EnvSource = process.env): PayPalEnv {
     webhookId: e.PAYPAL_WEBHOOK_ID,
     merchantEmail: e.PAYPAL_SANDBOX_MERCHANT_EMAIL,
     buyerEmail: e.PAYPAL_SANDBOX_BUYER_EMAIL,
+  };
+}
+
+export interface DemoAuthEnv {
+  email: string;
+  password: string;
+  sessionSecret: string | undefined;
+}
+
+export function getDemoAuthEnv(source: EnvSource = process.env): DemoAuthEnv {
+  const e = parseGroup(authSchema, source);
+  return {
+    email: e.DEMO_LOGIN_EMAIL.toLowerCase(),
+    password: e.DEMO_LOGIN_PASSWORD,
+    sessionSecret: e.AUTH_SESSION_SECRET,
   };
 }

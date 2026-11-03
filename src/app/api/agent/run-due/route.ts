@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { runDueAgents } from '@/lib/agent/run';
+import { isDemoRequestAuthenticated, unauthorizedResponse } from '@/lib/auth';
 
 const requestSchema = z.object({}).strict();
 
 export async function POST(request: Request): Promise<Response> {
+  if (!isDemoRequestAuthenticated(request)) return unauthorizedResponse();
   const raw = await request.text();
   let parsedBody: unknown = {};
   if (raw.trim()) {

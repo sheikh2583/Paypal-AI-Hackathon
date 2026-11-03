@@ -48,7 +48,7 @@ Late payment is a chronic cash-flow problem for freelancers and small shops. Cha
 
 ## Explicit non-goals
 
-Real email/SMS delivery, multi-currency, multi-user accounts/auth, real client onboarding, live PayPal, mobile app. Messages are shown in the UI as the "channel".
+Real email/SMS delivery, multi-currency, multi-user accounts/auth, real client onboarding, live PayPal, mobile app. The single-owner demo login is only a workspace gate for fictional demo data; it is not account provisioning or production identity management. Messages are shown in the UI as the "channel".
 
 ## Success criteria for the hackathon
 

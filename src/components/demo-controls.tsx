@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CreditCard, LoaderCircle, Play, RotateCcw } from "lucide-react";
 
@@ -22,6 +22,7 @@ export function DemoControls({ invoiceId, paymentId, compact = false, stepComple
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
 
   async function post(path: string, body: Record<string, string>, action: string) {
     setBusy(action);
@@ -42,6 +43,33 @@ export function DemoControls({ invoiceId, paymentId, compact = false, stepComple
     }
   }
 
+  useEffect(() => {
+    if (!confirmReset) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = document.getElementById("reset-demo-dialog");
+    const focusable = Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled])') ?? []);
+    focusable[0]?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setConfirmReset(false);
+      if (event.key === "Tab" && focusable.length > 0) {
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [confirmReset]);
+
   return (
     <div className={compact ? "space-y-2" : "rounded-2xl border bg-card p-5 shadow-sm"}>
       {!compact ? <div className="mb-4"><p className="text-sm font-semibold">Walk through Dana’s payment plan</p><p className="mt-1 text-sm text-muted-foreground">A repeatable scripted scenario. Client replies and payments are simulated; no real messages or money are sent.</p></div> : null}
@@ -59,7 +87,7 @@ export function DemoControls({ invoiceId, paymentId, compact = false, stepComple
           {busy === "pay" ? <LoaderCircle className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
           Simulate {paymentAmountCents === undefined ? "deposit" : `${money(paymentAmountCents)} deposit`} payment
         </button> : null}
-        {!compact ? <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm("Reset the fictional demo invoices, messages, approvals, and audit history?")) void post("/api/demo/reset", {}, "reset"); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
+        {!compact ? <button type="button" disabled={busy !== null} onClick={() => setConfirmReset(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
           {busy === "reset" ? <LoaderCircle className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
           Reset demo
         </button> : null}
@@ -68,6 +96,14 @@ export function DemoControls({ invoiceId, paymentId, compact = false, stepComple
       {stepComplete && !paymentId && !paymentComplete ? <p className="mt-3 text-sm text-muted-foreground">Installment invoices are ready. Open Dana’s invoice to review the schedule and simulate the deposit.</p> : null}
       {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
       {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
+      {confirmReset ? <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmReset(false); }}>
+        <section id="reset-demo-dialog" role="alertdialog" aria-modal="true" aria-labelledby="reset-demo-title" aria-describedby="reset-demo-description" className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
+          <div className="mb-4 grid size-11 place-items-center rounded-xl bg-amber-100 text-amber-800"><RotateCcw className="size-5" /></div>
+          <h2 id="reset-demo-title" className="text-lg font-semibold">Reset the demo workspace?</h2>
+          <p id="reset-demo-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">This restores the fictional invoices and clears demo messages, approvals, and audit activity. You can run the walkthrough again afterward.</p>
+          <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setConfirmReset(false)} className="min-h-10 rounded-lg border px-4 text-sm font-medium transition hover:bg-secondary">Keep current demo</button><button type="button" disabled={busy !== null} onClick={() => { setConfirmReset(false); void post("/api/demo/reset", {}, "reset"); }} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">{busy === "reset" ? "Resetting…" : "Reset demo"}</button></div>
+        </section>
+      </div> : null}
     </div>
   );
 }
