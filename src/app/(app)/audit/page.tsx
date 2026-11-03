@@ -1,22 +1,19 @@
 import type { Metadata } from "next";
-import { ScrollText } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
+import Link from "next/link";
+import { Check, CircleX, ScrollText } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { db } from "@/lib/db/client";
+import { getInvoice, listAudit } from "@/lib/db/queries";
 
 export const metadata: Metadata = { title: "Audit log" };
+export const dynamic = "force-dynamic";
 
 export default function AuditPage() {
-  return (
-    <>
-      <PageHeader
-        title="Audit log"
-        description="Every action the agent and you have taken, newest first."
-      />
-      <EmptyState
-        icon={ScrollText}
-        title="Coming soon"
-        description="Each tool call, policy decision and owner action will be recorded and searchable here."
-      />
-    </>
-  );
+  const entries = listAudit(undefined, db).slice(0, 100);
+  return <div className="space-y-5">
+    <PageHeader title="Audit log" description="A record of tool calls, policy decisions, simulated replies, and payments." />
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm"><div className="flex items-center justify-between border-b px-5 py-4"><div className="flex items-center gap-2"><ScrollText className="size-4 text-primary" /><h2 className="font-semibold">Recent activity</h2></div><span className="text-xs text-muted-foreground">Latest {entries.length}</span></div>
+      {entries.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">Actions will be recorded here as you run the demo.</p> : <ol className="divide-y">{entries.map((entry) => { const invoice = entry.invoiceId ? getInvoice(entry.invoiceId, db) : undefined; return <li key={entry.id} className="flex gap-3 px-5 py-4"><span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg ${entry.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{entry.ok ? <Check className="size-4" /> : <CircleX className="size-4" />}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="font-medium">{entry.action.replaceAll("_", " ")}</p><span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">{entry.actor}</span>{invoice ? <Link href={`/invoices/${invoice.id}`} className="text-xs text-primary hover:underline">{invoice.number}</Link> : null}</div><p className="mt-1 break-words text-xs text-muted-foreground">{JSON.stringify(entry.result)}</p><time className="mt-1 block text-[11px] text-muted-foreground">{new Date(entry.at).toLocaleString()}</time></div></li>; })}</ol>}
+    </section>
+  </div>;
 }

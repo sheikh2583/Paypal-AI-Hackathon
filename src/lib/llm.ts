@@ -294,8 +294,10 @@ export class ScriptedLLM implements LLM {
   private context: Record<string, unknown> | null = null;
   private lastPlanId: string | null = null;
 
-  constructor(persona = 'dana') {
+  constructor(persona = 'dana', initialTurn = 0, planId?: string | null) {
     this.persona = persona;
+    this.turn = initialTurn;
+    this.lastPlanId = planId ?? null;
   }
 
   async runToolLoop(opts: RunToolLoopOptions): Promise<{ summary: string; toolCalls: ToolCallRecord[] }> {
