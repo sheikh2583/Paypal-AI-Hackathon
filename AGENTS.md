@@ -44,6 +44,7 @@ pnpm lint
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run (includes the scripted evals)
 pnpm test:evals   # eval CLI; add --live to run against the real LLM
+pnpm llm:smoke    # one structured call and one read-only tool-loop call (skips without a key)
 pnpm paypal:smoke # create/send/get an invoice in the current PAYPAL_MODE
 pnpm db:push      # apply schema
 pnpm db:seed      # load demo data (idempotent: resets and reseeds)

@@ -115,6 +115,10 @@ The simulator prompt for each persona includes: who they are, their goal, how st
 
 A run returns a `RunOutcome` derived from its last effect: `NUDGED`, `PLAN_OFFERED`, `PLAN_ACTIVE`, `ESCALATED`, `WAITING` (follow-up scheduled, nothing sent) or `NO_ACTION` (no effect; `chase_state` unchanged).
 
+### Silent-client escalation
+
+After four agent reminders with no client reply, escalate to the owner using kind `UNCLEAR`; recommend a personal call or an owner-reviewed final notice. The runner enforces this threshold in code, and the prompt states it as guidance. System summaries do not count as reminders.
+
 ## Risk service, next action and follow-ups
 
 - `refreshRisk(invoiceId)` in `src/lib/risk/service.ts`: gathers features (days overdue, amount, client history, responsiveness, `unansweredNudges` = agent messages since the last client message, partial payment), calls `computeRisk`, stores `risk_score` and `risk_factors`, and writes a 1–2 sentence `risk_explanation` from the LLM (cached; regenerate only if null or the score moved by ≥ 5; scripted mode uses a template built from the factors). Call it from the seed, after any message insert, after any payment, and on advance-time.

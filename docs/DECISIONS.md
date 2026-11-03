@@ -123,3 +123,7 @@ Resolved before prompt 01, in response to the gap review after prompt 00. Each e
 ## Agent implementation
 
 **D47. Installed Anthropic SDK typing.** The installed `@anthropic-ai/sdk` 1.3.0 exposes message and tool types through `Anthropic.Messages`; `zodOutputFormat()` is nested under `output_config.format`. This differs from the newer SDK examples, so `llm.ts` follows the installed package types. Scripted turns persist per persona and resolve invoice, plan, and date placeholders from the current run/context so offline demo actions use real seeded IDs and amounts.
+
+**D48. Silent-client escalation threshold.** After four `agent_to_client` reminders since the latest client reply, escalate with the existing `UNCLEAR` approval kind. Enforce this in the runner and also include it in the system prompt; system summaries do not count as reminders.
+
+**D49. Seeding is asynchronous.** `seedDatabase` now awaits risk refresh for every seeded invoice so scores and explanations are present before `pnpm db:seed` completes; its direct CLI entry point and tests await the returned summaries.

@@ -31,6 +31,8 @@ export interface RunToolLoopOptions {
   messages: LlmMessage[];
   tools: ToolDefinition[];
   maxIterations: number;
+  signal?: AbortSignal;
+  toolChoiceName?: string;
   /** Called for each tool the model wants to invoke; must return a JSON string. */
   onToolCall: (call: ToolCallRequest) => Promise<string>;
 }
@@ -65,12 +67,13 @@ class AnthropicLLM implements LLM {
     return new Anthropic({ apiKey: this.apiKey });
   }
 
-  private async callWithRetry<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async callWithRetry<T>(fn: (signal: AbortSignal) => Promise<T>, outerSignal?: AbortSignal): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (outerSignal?.aborted) throw outerSignal.reason ?? new Error('LLM call aborted');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
       try {
-        return await fn(controller.signal);
+        return await fn(outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal);
       } catch (err: unknown) {
         clearTimeout(timeout);
         const isRetryable =
@@ -103,6 +106,7 @@ class AnthropicLLM implements LLM {
     let iterations = 0;
 
     while (iterations < opts.maxIterations) {
+      if (opts.signal?.aborted) throw opts.signal.reason ?? new Error('LLM call aborted');
       const response = await this.callWithRetry((signal) =>
         client.messages.create(
           {
@@ -111,10 +115,11 @@ class AnthropicLLM implements LLM {
             system: opts.system,
             messages,
             tools: sdkTools,
+            ...(opts.toolChoiceName ? { tool_choice: { type: 'tool' as const, name: opts.toolChoiceName } } : {}),
           },
           { signal },
         ),
-      );
+      opts.signal);
 
       if (response.stop_reason !== 'tool_use') {
         // Extract text summary from final response.
@@ -199,6 +204,7 @@ export class ScriptedLLM implements LLM {
   }
 
   async runToolLoop(opts: RunToolLoopOptions): Promise<{ summary: string; toolCalls: ToolCallRecord[] }> {
+    if (opts.signal?.aborted) throw opts.signal.reason ?? new Error('LLM call aborted');
     const { scripts } = await import('./agent/scripts');
     const script = scripts[this.persona];
     const agentTurns = script?.agentTurns;
@@ -335,6 +341,12 @@ export function getLLM(persona = 'dana'): LLM {
   const created = new ScriptedLLM(persona);
   scriptedInstances.set(persona, created);
   return created;
+}
+
+export function createLiveLLM(): LLM {
+  const env = getLlmEnv();
+  if (!env.apiKey) throw new Error('ANTHROPIC_API_KEY is required for live LLM mode');
+  return new AnthropicLLM(env.apiKey, env.model);
 }
 
 const scriptedInstances = new Map<string, ScriptedLLM>();

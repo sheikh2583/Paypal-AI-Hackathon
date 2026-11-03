@@ -6,10 +6,10 @@ import { closeTestDb, createTestDb } from "./test-utils";
 const DEMO_NOW = new Date("2026-11-02T12:00:00.000Z");
 
 describe("seedDatabase", () => {
-  it("is idempotent — second run produces identical rows", () => {
+  it("is idempotent — second run produces identical rows", async () => {
     const database = createTestDb();
     try {
-      const firstSummaries = seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      const firstSummaries = await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const firstCounts = database.$client
         .prepare(
           `SELECT (SELECT count(*) FROM clients) AS clients,
@@ -22,7 +22,7 @@ describe("seedDatabase", () => {
         .prepare("SELECT id, status, amount_cents, due_at FROM invoices ORDER BY id")
         .all();
 
-      const secondSummaries = seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      const secondSummaries = await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const secondCounts = database.$client
         .prepare(
           `SELECT (SELECT count(*) FROM clients) AS clients,
@@ -45,10 +45,10 @@ describe("seedDatabase", () => {
 
   // Contract test: seeded invoices must match the exact table in docs/07.
   // Total overdue must equal $5,500 (550000 cents).
-  it("matches docs/07 seed data exactly", () => {
+  it("matches docs/07 seed data exactly", async () => {
     const database = createTestDb();
     try {
-      const summaries = seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      const summaries = await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
 
       // Exact five clients/invoices from docs/07 in persona order
       expect(summaries).toHaveLength(5);
@@ -72,10 +72,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("returns five overdue invoice summaries with correct client names", () => {
+  it("returns five overdue invoice summaries with correct client names", async () => {
     const database = createTestDb();
     try {
-      const summaries = seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      const summaries = await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       expect(summaries.map(({ client, amountCents }) => [client, amountCents])).toEqual([
         ["Dana Whitfield",  90000],
         ["Marcus Lee",     125000],
@@ -88,10 +88,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("seeds correct table row counts: 5 clients, 7 invoices, 7 messages, 7 mock PayPal rows", () => {
+  it("seeds correct table row counts: 5 clients, 7 invoices, 7 messages, 7 mock PayPal rows", async () => {
     const database = createTestDb();
     try {
-      seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const counts = database.$client
         .prepare(
           `SELECT (SELECT count(*) FROM clients) AS clients,
@@ -107,10 +107,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("seeds owner policy matching docs/07 exactly", () => {
+  it("seeds owner policy matching docs/07 exactly", async () => {
     const database = createTestDb();
     try {
-      seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const policy = database.$client
         .prepare(
           `SELECT min_deposit_percent, max_installments, max_plan_days,
@@ -134,10 +134,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("uses fake @example.com emails in mock mode", () => {
+  it("uses fake @example.com emails in mock mode", async () => {
     const database = createTestDb();
     try {
-      seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const emails = database.$client
         .prepare("SELECT email FROM clients ORDER BY id")
         .all() as { email: string }[];
@@ -149,11 +149,11 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("uses sandbox buyer email for every client in sandbox mode", () => {
+  it("uses sandbox buyer email for every client in sandbox mode", async () => {
     const database = createTestDb();
     const buyerEmail = "buyer@sandbox.paypal.com";
     try {
-      seedDatabase(database, { paypalMode: "sandbox", sandboxBuyerEmail: buyerEmail }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "sandbox", sandboxBuyerEmail: buyerEmail }, DEMO_NOW);
       const emails = database.$client
         .prepare("SELECT email FROM clients ORDER BY id")
         .all() as { email: string }[];
@@ -165,10 +165,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("history invoices are PAID and their clients have matching late history", () => {
+  it("history invoices are PAID and their clients have matching late history", async () => {
     const database = createTestDb();
     try {
-      seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const paidInvoices = database.$client
         .prepare("SELECT id, status FROM invoices WHERE status = 'PAID'")
         .all() as { id: string; status: string }[];
@@ -192,10 +192,10 @@ describe("seedDatabase", () => {
     }
   });
 
-  it("all overdue invoices have status OVERDUE, paid_cents 0, and chase_state NEW", () => {
+  it("all overdue invoices have status OVERDUE, paid_cents 0, and chase_state NEW", async () => {
     const database = createTestDb();
     try {
-      seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
+      await seedDatabase(database, { paypalMode: "mock" }, DEMO_NOW);
       const overdue = database.$client
         .prepare("SELECT status, paid_cents, chase_state FROM invoices WHERE status = 'OVERDUE'")
         .all() as { status: string; paid_cents: number; chase_state: string }[];

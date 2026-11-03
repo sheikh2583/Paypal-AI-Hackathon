@@ -46,12 +46,12 @@ export function computeRisk(features: RiskFeatures): RiskResult {
 
   // Amount
   let amountImpact = 0;
-  const amountDollars = features.amountCents / 100;
-  if (amountDollars < 500) amountImpact = 0;
-  else if (amountDollars <= 1500) amountImpact = 5;
+  if (features.amountCents < 50_000) amountImpact = 0;
+  else if (features.amountCents <= 150_000) amountImpact = 5;
   else amountImpact = 10;
   if (amountImpact !== 0) {
-    factors.push({ factor: `Invoice amount ($${amountDollars.toFixed(2)})`, impact: amountImpact });
+    const amountLabel = `$${Math.floor(features.amountCents / 100)}.${String(features.amountCents % 100).padStart(2, '0')}`;
+    factors.push({ factor: `Invoice amount (${amountLabel})`, impact: amountImpact });
   }
 
   // Client late history: +5 × min(lateCount, 4)

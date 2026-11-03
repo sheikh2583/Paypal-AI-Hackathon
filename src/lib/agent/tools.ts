@@ -16,6 +16,7 @@ import { audit } from '../audit';
 import { emit } from '../events';
 import { evaluatePlan, rebasePlan, remainingCents, discountedTotal } from '../policy';
 import { getPayPal } from '../paypal/index';
+import { refreshRisk } from '../risk/service';
 import {
   getInvoice,
   getClient,
@@ -351,6 +352,7 @@ async function handleSendMessage(
     },
     database,
   );
+  await refreshRisk(invoice.id, database, now);
 
   // Transition NEW → NUDGED on first send.
   if (invoice.chaseState === 'NEW') {

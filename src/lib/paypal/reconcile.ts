@@ -13,6 +13,7 @@ import { audit } from "../audit";
 import { emit } from "../events";
 import { getNow } from "../clock";
 import { getPayPal } from "./index";
+import { refreshRisk } from "../risk/service";
 
 function mapPayPalStatusToLocal(paypalStatus: PayPalInvoice["status"]): InvoiceStatus | null {
   switch (paypalStatus) {
@@ -106,6 +107,9 @@ export async function reconcilePayPalInvoices(database: AppDb = db): Promise<voi
       { status: newStatus, paidCents: paypalInvoice.paidCents },
       database,
     );
+    if (newStatus === "PAID" || newStatus === "PARTIALLY_PAID") {
+      await refreshRisk(invoice.id, database, new Date(now));
+    }
 
     audit(
       {

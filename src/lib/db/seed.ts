@@ -4,6 +4,7 @@ import { getPayPalEnv } from "../env";
 import { getNow } from "../clock";
 import type { AppDb } from "./client";
 import { db } from "./client";
+import { refreshRisk } from "../risk/service";
 import { clients, invoices, kv, messages, mockPaypalInvoices, ownerPolicy } from "./schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -156,11 +157,11 @@ function isoAtDaysBefore(now: Date, days: number): string {
   return new Date(now.getTime() - days * DAY_MS).toISOString();
 }
 
-export function seedDatabase(
+export async function seedDatabase(
   database: AppDb = db,
   options: SeedOptions = {},
   suppliedNow?: Date,
-): SeededInvoiceSummary[] {
+): Promise<SeededInvoiceSummary[]> {
   const paypalEnv =
     options.paypalMode === undefined ||
     (options.paypalMode === "sandbox" && options.sandboxBuyerEmail === undefined)
@@ -324,6 +325,10 @@ export function seedDatabase(
 
   database.insert(kv).values({ key: "clock_offset_days", value: "0" }).run();
 
+  for (const invoice of allInvoices) {
+    await refreshRisk(invoice.id, database, now);
+  }
+
   return overdueInvoiceSeed.map((invoice) => {
     const client = clientSeed.find((c) => c.id === invoice.clientId)!;
     return {
@@ -339,11 +344,15 @@ export function seedDatabase(
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const summaries = seedDatabase();
-  console.log(`Seeded ${summaries.length} overdue invoices.`);
-  for (const invoice of summaries) {
-    console.log(
-      `${invoice.client} (${invoice.persona}) | ${invoice.number} | $${(invoice.amountCents / 100).toFixed(2)} | ${invoice.daysOverdue}d overdue`,
-    );
-  }
+  void seedDatabase().then((summaries) => {
+    console.log(`Seeded ${summaries.length} overdue invoices.`);
+    for (const invoice of summaries) {
+      console.log(
+        `${invoice.client} (${invoice.persona}) | ${invoice.number} | $${(invoice.amountCents / 100).toFixed(2)} | ${invoice.daysOverdue}d overdue`,
+      );
+    }
+  }).catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : 'Seed failed');
+    process.exitCode = 1;
+  });
 }

@@ -370,11 +370,15 @@ export function setKv(key: string, value: string, database: AppDb = db): void {
 // ---------------------------------------------------------------------------
 
 export type InvoiceUpdate = Partial<
-  Pick<InvoiceRow, "status" | "paidCents" | "paypalInvoiceId" | "paypalInvoiceUrl" | "chaseState" | "planId" | "lastAgentRunAt" | "nextFollowupAt" | "riskScore" | "riskExplanation">
+  Pick<InvoiceRow, "status" | "paidCents" | "paypalInvoiceId" | "paypalInvoiceUrl" | "chaseState" | "planId" | "lastAgentRunAt" | "nextFollowupAt" | "riskScore" | "riskFactors" | "riskExplanation">
 >;
 
 export function updateInvoice(id: string, update: InvoiceUpdate, database: AppDb = db): InvoiceRow | undefined {
-  const row = database.update(invoices).set(update).where(eq(invoices.id, id)).returning().all()[0];
+  const { riskFactors, ...values } = update;
+  const row = database.update(invoices).set({
+    ...values,
+    ...(riskFactors !== undefined ? { riskFactorsJson: JSON.stringify(riskFactors) } : {}),
+  }).where(eq(invoices.id, id)).returning().all()[0];
   return row ? mapInvoice(row) : undefined;
 }
 
