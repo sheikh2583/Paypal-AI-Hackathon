@@ -34,6 +34,21 @@ const appSchema = z.object({
   DEMO_PUBLIC: z.preprocess(blankToUndefined, z.enum(["0", "1"]).default("0")),
 });
 
+const databaseSchema = z.object({
+  TURSO_DATABASE_URL: z.preprocess(blankToUndefined, z.url({
+    protocol: /^libsql$/,
+    hostname: /\.turso\.io$/,
+  }).optional()),
+  TURSO_AUTH_TOKEN: optionalString,
+}).superRefine((env, ctx) => {
+  if (env.TURSO_DATABASE_URL && !env.TURSO_AUTH_TOKEN) {
+    ctx.addIssue({ code: "custom", path: ["TURSO_AUTH_TOKEN"], message: "required with TURSO_DATABASE_URL" });
+  }
+  if (env.TURSO_AUTH_TOKEN && !env.TURSO_DATABASE_URL) {
+    ctx.addIssue({ code: "custom", path: ["TURSO_DATABASE_URL"], message: "required with TURSO_AUTH_TOKEN" });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // LLM
 // ---------------------------------------------------------------------------
@@ -97,6 +112,7 @@ const authSchema = z.object({
 /** Every variable the app reads. env.test.ts checks this against .env.example. */
 export const ENV_KEYS: readonly string[] = [
   ...Object.keys(appSchema.shape),
+  ...Object.keys(databaseSchema.shape),
   ...Object.keys(llmSchema.shape),
   ...Object.keys(paypalSchema.shape),
   ...Object.keys(authSchema.shape),
@@ -150,6 +166,13 @@ export function getAppEnv(source: EnvSource = process.env): AppEnv {
     demoNow: e.DEMO_NOW,
     demoPublic: e.DEMO_PUBLIC === "1",
   };
+}
+
+export function getDatabaseEnv(source: EnvSource = process.env) {
+  const { TURSO_DATABASE_URL: url, TURSO_AUTH_TOKEN: authToken } = parseGroup(databaseSchema, source);
+  return url && authToken
+    ? { mode: "turso" as const, url, authToken }
+    : { mode: "local" as const, path: getAppEnv(source).databasePath };
 }
 
 export type ResolvedLlmMode = "live" | "scripted";

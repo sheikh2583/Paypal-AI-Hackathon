@@ -2,7 +2,8 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import BetterSqlite3 from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { getAppEnv } from "../env";
+import LibSqlite from "libsql";
+import { getDatabaseEnv } from "../env";
 import { schema } from "./schema";
 
 export type AppDb = BetterSQLite3Database<typeof schema> & {
@@ -23,7 +24,18 @@ export function openDb(databasePath: string): AppDb {
 
 let singleton: AppDb | undefined;
 function getSingleton(): AppDb {
-  singleton ??= openDb(getAppEnv().databasePath);
+  if (!singleton) {
+    const settings = getDatabaseEnv();
+    if (settings.mode === "local") {
+      singleton = openDb(settings.path);
+    } else {
+      const options = { authToken: settings.authToken, timeout: 5_000 };
+      // The native libSQL driver implements the synchronous better-sqlite3 API
+      // used by Drizzle, Better Auth, and the existing payment transactions.
+      const sqlite = new LibSqlite(settings.url, options);
+      singleton = drizzle(sqlite as unknown as BetterSqlite3.Database, { schema });
+    }
+  }
   return singleton;
 }
 

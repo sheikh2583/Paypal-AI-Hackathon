@@ -48,15 +48,14 @@ The following are set in the Render dashboard (`sync: false`):
 > **Note:** With `DEMO_PUBLIC=1` none of the auth-related variables are required. The app
 > works without them. Set them if you want to later switch off `DEMO_PUBLIC` and use real auth.
 
-## Turning off DEMO_PUBLIC (post-hackathon)
+## Durable owner workspace on Render Free
 
-1. Remove `DEMO_PUBLIC=1` from `render.yaml` (or set to `0`).
-2. Add a persistent database (Render's managed PostgreSQL, or a Turso/Neon SQLite-over-HTTP).
-3. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM`.
-4. Navigate to `/setup` to create the owner account.
+1. Create a Turso SQLite database in the same region as the Render web service and issue a database-scoped read/write token.
+2. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in the service's Environment tab. The existing startup sequence creates the schema and populates an empty workspace. It preserves existing invoices and webhook history on subsequent starts.
+3. Keep `DEMO_PUBLIC` unset or set it to `0`. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM`.
+4. Once the durable deployment is live, visit `/setup` to create the owner account, verify it, and sign in. Confirm `/setup` still redirects to `/login` after a redeploy.
 
-> **Do not add a "persistent disk" on Render Free.** Persistent disks are a paid Render
-> feature and are not available on the free plan. The demo is designed to work without one.
+The first Turso startup uses that database's contents. Export any existing records before a cutover if they must be transferred.
 
 ## Troubleshooting
 
@@ -64,9 +63,7 @@ The following are set in the Render dashboard (`sync: false`):
 Repaired in `ensureAuthSchema()` — the `rateLimit.id` column is added *before* Better Auth
 validates the schema. Fully idempotent; safe to re-run.
 
-**Demo data missing after a restart:**
-`db:seed-if-empty` runs on every startup. If it reports "already has data" unexpectedly,
-`pnpm db:seed` (the destructive full-reseed) can be run manually via Render's shell.
+**Demo data missing after a restart:** Check whether `db:seed-if-empty` reported an empty workspace or skipped because invoices already exist. Check that both Turso environment keys are set on the deployed service.
 
 **Judges see a login page:**
 Ensure `DEMO_PUBLIC=1` is set in `render.yaml` and that the deploy completed successfully.

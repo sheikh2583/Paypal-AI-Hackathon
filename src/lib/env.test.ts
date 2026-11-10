@@ -6,6 +6,7 @@ import {
   EnvError,
   getAppEnv,
   getAuthEnv,
+  getDatabaseEnv,
   getLlmEnv,
   getPayPalEnv,
   SANDBOX_BASE_URL,
@@ -16,6 +17,26 @@ describe("env schema coverage", () => {
     const text = readFileSync(path.join(process.cwd(), ".env.example"), "utf8");
     const documented = [...text.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]);
     expect([...ENV_KEYS].sort()).toEqual([...documented].sort());
+  });
+});
+
+describe("getDatabaseEnv", () => {
+  const url = "libsql://chaser.example.turso.io";
+
+  it("uses the local path unless both Turso settings are configured", () => {
+    expect(getDatabaseEnv({ DATABASE_PATH: "./test/chaser.db", TURSO_AUTH_TOKEN: "" }))
+      .toEqual({ mode: "local", path: "./test/chaser.db" });
+    expect(getDatabaseEnv({ TURSO_DATABASE_URL: url, TURSO_AUTH_TOKEN: "test-token" }))
+      .toEqual({ mode: "turso", url, authToken: "test-token" });
+  });
+
+  it("fails closed on incomplete credentials and non-Turso endpoints", () => {
+    expect(() => getDatabaseEnv({ TURSO_DATABASE_URL: url })).toThrow(/TURSO_AUTH_TOKEN/);
+    expect(() => getDatabaseEnv({ TURSO_AUTH_TOKEN: "test-token" })).toThrow(/TURSO_DATABASE_URL/);
+    expect(() => getDatabaseEnv({
+      TURSO_DATABASE_URL: "libsql://example.com",
+      TURSO_AUTH_TOKEN: "test-token",
+    })).toThrow(/TURSO_DATABASE_URL/);
   });
 });
 

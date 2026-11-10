@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createLiveLLM, OpenAICompatibleLLM } from './llm';
 
+vi.mock('./clock', () => ({ getNow: () => new Date('2026-11-10T00:00:00.000Z') }));
+
 const url = 'https://provider.test/v1';
 const key = 'test-secret-123';
 const model = 'unit-model';

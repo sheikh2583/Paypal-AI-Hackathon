@@ -2,6 +2,8 @@
 
 These are the interfaces three people build against in parallel. They mirror `src/lib/types.ts`. **If you change one, update this file and tell the team.**
 
+The server uses `DATABASE_PATH` for local SQLite. Set both `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` to use hosted SQLite for application data and Better Auth. Supplying just one setting is an error.
+
 ## Shared types (`src/lib/types.ts`)
 
 ```ts
