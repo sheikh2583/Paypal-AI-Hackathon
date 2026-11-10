@@ -34,13 +34,15 @@ import {
 } from '../db/queries';
 import type { ToolDefinition } from '../llm';
 import { getLlmEnv, getPayPalEnv } from '../env';
+import { exposesAgentInstructions, wrapClientMessage } from './prompt';
 
 // ---------------------------------------------------------------------------
 // Helpers: functions not yet in queries.ts
 // ---------------------------------------------------------------------------
 
 /** Simple URL extraction regex (D7 allowlist). */
-const URL_REGEX = /https?:\/\/[^\s"'<>)]+/g;
+const URL_REGEX = /(?:[a-z][a-z\d+.-]*:\/\/|\/\/|mailto:|www\.)[^\s<>"']+|\b(?:[a-z\d-]+\.)+[a-z]{2,63}\b(?:\/[^\s<>"']*)?/gi;
+const UNSAFE_TONE = /\b(?:we will sue|legal action|final warning|last chance|or else|report you to|you have 24 hours)\b/i;
 
 /** Returns the set of allowed URLs for a given invoice (its own + plan siblings). */
 function allowedUrlsForInvoice(invoice: InvoiceRow, database: AppDb): Set<string> {
@@ -201,19 +203,20 @@ const getInvoiceContextSchema = z.object({
 
 const sendMessageSchema = z.object({
   invoiceId: z.string().min(1),
-  body: z.string().max(900, 'Message body must be 900 characters or fewer'),
+  body: z.string().trim().min(1).max(900, 'Message body must be 900 characters or fewer'),
 });
 
 const installmentSchema = z.object({
   no: z.number().int().positive(),
   amountCents: z.number().int().positive(),
-  dueAt: z.string().min(1),
+  dueAt: z.union([z.iso.date(), z.iso.datetime({ offset: true })]),
 });
 
 const proposePlanSchema = z.object({
   invoiceId: z.string().min(1),
   discountPercent: z.number().min(0).max(100),
-  installments: z.array(installmentSchema).min(1),
+  installments: z.array(installmentSchema).min(1)
+    .refine((items) => items.every((item, index) => item.no === index + 1), 'Installments must be numbered in order starting at 1'),
 });
 
 const createPlanInvoicesSchema = z.object({
@@ -301,7 +304,7 @@ async function handleGetInvoiceContext(
       : null,
     messages: msgs.map((m) => ({
       direction: m.direction,
-      body: m.body,
+      body: m.direction === 'client_to_agent' ? wrapClientMessage(m.body) : m.body,
       createdAt: m.createdAt,
     })),
     unansweredNudges,
@@ -333,11 +336,8 @@ async function handleSendMessage(
   }
   const input = parsed.data;
 
-  // Belt-and-suspenders length check (Zod max(900) already covers this).
-  if (input.body.length > 900) {
-    audit({ actor: 'agent', action: 'send_message', invoiceId: input.invoiceId, input, result: { ok: false, error: 'BODY_TOO_LONG' }, ok: false }, database);
-    return JSON.stringify({ ok: false, error: 'BODY_TOO_LONG' });
-  }
+  if (exposesAgentInstructions(input.body)) return JSON.stringify({ ok: false, error: 'MESSAGE_POLICY_LEAK' });
+  if (UNSAFE_TONE.test(input.body)) return JSON.stringify({ ok: false, error: 'MESSAGE_UNSAFE_TONE' });
 
   const invoice = getInvoice(input.invoiceId, database);
   if (!invoice) {
@@ -348,7 +348,7 @@ async function handleSendMessage(
   const foundUrls = input.body.match(URL_REGEX) ?? [];
   if (foundUrls.length > 0) {
     const allowed = allowedUrlsForInvoice(invoice, database);
-    const forbidden = foundUrls.filter((u) => !allowed.has(u));
+    const forbidden = foundUrls.filter((url) => !allowed.has(url) && !allowed.has(url.replace(/[),.!?;]+$/, '')));
     if (forbidden.length > 0) {
       audit({ actor: 'agent', action: 'send_message', invoiceId: input.invoiceId, input, result: { ok: false, error: 'URL_NOT_ALLOWED', forbidden }, ok: false }, database);
       return JSON.stringify({ ok: false, error: 'URL_NOT_ALLOWED', forbidden });
@@ -494,7 +494,9 @@ async function handleCreatePlanInvoices(
 
   // Idempotency: already active.
   if (plan.status === 'ACTIVE') {
-    return JSON.stringify({ ok: true, alreadyDone: true });
+    const result = { ok: true, alreadyDone: true };
+    audit({ actor: 'agent', action: 'create_plan_invoices', invoiceId: plan.invoiceId, input, result, ok: true }, database);
+    return JSON.stringify(result);
   }
 
   if (plan.status !== 'ACCEPTED') {

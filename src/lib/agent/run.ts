@@ -1,11 +1,11 @@
 import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
-import { getClient, getInvoice, getMessages, getPolicy, insertMessage, listInvoices, updateInvoice } from '../db/queries';
+import { getClient, getInvoice, getMessages, getPlan, getPolicy, insertMessage, listInvoices, updateInvoice } from '../db/queries';
 import { audit } from '../audit';
-import { getLLM, ScriptedLLM, isRetryableLlmError, type LLM } from '../llm';
+import { getLLM, ScriptedLLM, isRetryableLlmError, type LLM, type ToolCallRequest } from '../llm';
 import { getLlmEnv } from '../env';
 import type { AgentRunResult, PayPalClient, RunOutcome, ToolCallRecord } from '../types';
-import { buildSystemPrompt, wrapClientMessage } from './prompt';
+import { buildSystemPrompt, exposesAgentInstructions, wrapClientMessage } from './prompt';
 import { agentTools, handleToolCall } from './tools';
 import { refreshRisk } from '../risk/service';
 
@@ -55,6 +55,16 @@ export async function runAgent(
       maxDiscountPercent: policy.maxDiscountPercent,
       tone: policy.tone,
     }, policy.ownerName, policy.businessName, policy.tone);
+    function executeTool({ name, input }: ToolCallRequest): Promise<string> {
+      const args = input as { invoiceId?: unknown; planId?: unknown } | undefined;
+      const plan = name === 'create_plan_invoices' && typeof args?.planId === 'string' ? getPlan(args.planId, database) : undefined;
+      if ((typeof args?.invoiceId === 'string' && args.invoiceId !== invoiceId) || (plan && plan.invoiceId !== invoiceId)) {
+        const result = { ok: false, error: 'TOOL_SCOPE_VIOLATION' };
+        audit({ actor: 'agent', action: name, invoiceId, input, result, ok: false }, database);
+        return Promise.resolve(JSON.stringify(result));
+      }
+      return handleToolCall(name, input, database, getNow(), options.paypal);
+    }
 
     let result: { summary: string; toolCalls: ToolCallRecord[] };
     if (unansweredNudges >= 4) {
@@ -88,7 +98,8 @@ export async function runAgent(
         tools: agentTools,
         maxIterations: MAX_TOOL_ITERATIONS,
         signal: controller.signal,
-        onToolCall: async ({ name, input }) => {
+        onToolCall: async (call) => {
+          const { name } = call;
           callsDispatched += 1;
           if (controller.signal.aborted) return JSON.stringify({ ok: false, error: 'AGENT_RUN_TIMEOUT' });
           if (callsDispatched > MAX_TOOL_ITERATIONS) {
@@ -96,7 +107,7 @@ export async function runAgent(
             return JSON.stringify({ ok: false, error: 'ITERATION_LIMIT' });
           }
           if (name !== 'get_invoice_context') sideEffectRan = true;
-          return handleToolCall(name, input, database, getNow(), options.paypal);
+          return executeTool(call);
         },
       });
       try {
@@ -112,13 +123,13 @@ export async function runAgent(
         result = await new ScriptedLLM(client.persona ?? 'dana').runToolLoop({
           system, messages: [{ role: 'user', content: JSON.stringify({ invoiceId, latestClientMessage: lastClientMessage ? wrapClientMessage(lastClientMessage.body) : null }) }],
           tools: agentTools, maxIterations: MAX_TOOL_ITERATIONS, signal: controller.signal,
-          onToolCall: async ({ name, input }) => {
+          onToolCall: async (call) => {
             callsDispatched += 1;
             if (callsDispatched > MAX_TOOL_ITERATIONS) {
-              audit({ actor: 'agent', action: 'agent.iteration_cap', invoiceId, input: { name }, result: { ok: false }, ok: false }, database);
+              audit({ actor: 'agent', action: 'agent.iteration_cap', invoiceId, input: { name: call.name }, result: { ok: false }, ok: false }, database);
               return JSON.stringify({ ok: false, error: 'ITERATION_LIMIT' });
             }
-            return handleToolCall(name, input, database, getNow(), options.paypal);
+            return executeTool(call);
           },
         });
       }
@@ -161,7 +172,7 @@ export function isAgentRunInProgress(invoiceId: string): boolean {
 function oneSentence(text: string, outcome: RunOutcome): string {
   const cleaned = text.trim().replace(/\s+/g, ' ');
   const firstSentence = cleaned.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
-  if (firstSentence) return firstSentence;
+  if (firstSentence && !exposesAgentInstructions(cleaned)) return firstSentence;
   const fallback: Record<RunOutcome, string> = {
     NUDGED: 'Sent a reminder about the overdue invoice.',
     PLAN_OFFERED: 'Prepared a payment plan within the owner policy.',

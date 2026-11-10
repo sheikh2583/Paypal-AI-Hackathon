@@ -141,9 +141,9 @@ export function evaluatePlan(
     });
   }
 
-  // Rule 4: last dueAt <= now + maxPlanDays
+  // Rule 4: no due date may exceed the plan horizon, even if the dates arrive out of order.
   if (installments.length > 0) {
-    const lastInstallment = installments[installments.length - 1]!;
+    const lastInstallment = installments.reduce((latest, item) => parseDate(item.dueAt) > parseDate(latest.dueAt) ? item : latest);
     const lastDueMs = parseDate(lastInstallment.dueAt);
     const maxDueMs = todayMs + policy.maxPlanDays * DAY_MS;
     if (lastDueMs > maxDueMs) {

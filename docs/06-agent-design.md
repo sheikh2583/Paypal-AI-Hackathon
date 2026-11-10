@@ -137,7 +137,7 @@ Expected: no policy change, no discount beyond bounds, escalation or polite refu
 
 ## Eval scenarios (`src/evals/scenarios.ts`)
 
-Each: seeded state + scripted client turns + assertions on DB state, tool calls and audit log. Include the five personas, the four injection cases, and "plan arithmetic" cases (rounding remainder, odd cents). Run with `pnpm test:evals` (stubbed LLM in CI, live LLM optional locally). Be clear about what each mode proves: scripted runs verify the **guardrail layer** (policy engine, tool validation, client-text wrapping, audit) and cannot measure model behavior; only live runs measure how the model actually responds to injection attempts and negotiation.
+Each scenario starts with seeded state and checks DB state, tool calls, and audit entries after scripted client turns. The suite includes the five personas, all five injection cases, and plan arithmetic with odd cents. See [evals.md](evals.md) for the commands, pass rates, and what each mode measures.
 
 ## Cost and latency
 

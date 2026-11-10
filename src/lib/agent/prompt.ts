@@ -58,3 +58,7 @@ export function wrapClientMessage(text: string): string {
     .replace(/>/g, '&gt;');
   return `<client_message>\n${sanitized}\n</client_message>`;
 }
+
+export function exposesAgentInstructions(text: string): boolean {
+  return /you are chaser|your goals, in order|how you work:|<\/?client_message>|\b(?:minimum deposit|maximum (?:discount|installments|plan duration)|discount limit)\s*(?:(?:is|of|:)\s*)?\d/i.test(text);
+}

@@ -4,6 +4,7 @@ import type { ToolCallRecord } from './types';
 import { getLlmEnv } from './env';
 import type Anthropic from '@anthropic-ai/sdk';
 import { getNow } from './clock';
+import { wrapClientMessage } from './agent/prompt';
 import { toJSONSchema as zodToJsonSchema } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -407,13 +408,14 @@ export class ScriptedLLM implements LLM {
     const { scripts } = await import('./agent/scripts');
     const script = scripts[this.persona];
     if (script?.classifications && script.classifications.length > 0) {
-      const userText = opts.input.toLowerCase();
-      const classification = userText.includes('split') || userText.includes('cannot pay')
-        ? script.classifications.find((c) => c.intent === 'cannot_pay_full')
-        : userText.includes('yes') || userText.includes('sounds great')
-          ? script.classifications.find((c) => c.intent === 'accepts_plan')
-          : script.classifications[0];
-      if (classification) return classification as unknown as T;
+      try {
+        const input = JSON.parse(opts.input) as { clientMessage?: unknown };
+        const index = script.clientReplies.findIndex((reply) => reply && wrapClientMessage(reply) === input?.clientMessage);
+        const classification = script.classifications[index];
+        if (classification) return classification as unknown as T;
+      } catch {
+        // Only recognized, delimited persona replies have a scripted classification.
+      }
     }
     // Fallback: return a minimal 'unclear' classification.
     return {
@@ -441,8 +443,7 @@ export function getLLM(persona = 'dana'): LLM {
   return created;
 }
 
-export function createLiveLLM(): LLM {
-  const env = getLlmEnv();
+export function createLiveLLM(env = getLlmEnv()): LLM {
   if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEY'} is required for live LLM mode`);
   if (env.provider === 'openai-compatible') return new OpenAICompatibleLLM(env.baseUrl!, env.apiKey, env.model);
   return new AnthropicLLM(env.apiKey, env.model);
