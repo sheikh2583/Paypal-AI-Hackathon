@@ -23,4 +23,10 @@
 
 In mock mode, the workspace's **Simulate payment** button updates the mock provider and runs the same reconciler. For an isolated listener smoke test, POST an event with a fresh `id`, `event_type: "INVOICING.INVOICE.PAID"`, and `resource: {id: "<mock PayPal invoice ID>"}`, using `X-Chaser-Mock-Webhook: 1`. The event itself cannot change the mock provider's balance. The handler reads the provider record.
 
-Render Free recreates its SQLite database after spin-down or redeploy. Use current demo invoices when testing and expect previously linked invoice IDs and webhook dedupe rows to be absent after a reset.
+## Replay the hosted demo
+
+The Singapore Render service uses Turso for persistent business and owner data. Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` together. Data persists through Render spin-downs and redeploys. Startup skips seeding if any business table already has records and logs the reason.
+
+On the fictional demo workspace, enable `DEMO_PUBLIC=1` so judges can open the dashboard without signing in. Choose **Reset demo** and confirm to restore Dana's starting state and clear the demo clock, invoices, plans, and business history. Owner accounts and sessions survive. Wait at least 10 seconds between resets. The private hosted workspace keeps reset disabled.
+
+In Sandbox, reset checks only previously linked, app-issued installments and attempts to cancel those still open and unpaid after the reset response. Paid invoices remain in PayPal. Check the new workspace audit log for `demo.reset.cancel_invoice` if cleanup fails. Use the fresh installment links on each run. Old webhook deliveries can be recorded as unknown because their original links and dedupe records were cleared. If a payment webhook is delayed, the invoice API and dashboard trigger reconciliation on read, and public mode polls every 10 seconds after the first workspace read.

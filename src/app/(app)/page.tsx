@@ -7,7 +7,7 @@ import { db } from "@/lib/db/client";
 import { getMessages, listApprovals, listPlansByInvoiceId } from "@/lib/db/queries";
 import { getNow } from "@/lib/clock";
 import { getDemoSession } from "@/lib/auth";
-import { demoEnabled } from "@/lib/demo";
+import { demoEnabled, demoResetAvailable } from "@/lib/demo";
 import { getLlmEnv, getPayPalEnv } from "@/lib/env";
 import { listInvoiceItems } from "@/lib/invoice-list";
 import { reconcilePayPalOnRead } from "@/lib/paypal/poll";
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
         <SummaryCard icon={ShieldCheck} label="Policy guardrails" value="Active" detail="30% deposit · max 3 installments · 5% discount" />
       </section>
 
-      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paypalMode={paypalMode} llmMode={getLlmEnv().mode} showTimeControls /> : null}
+      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paypalMode={paypalMode} llmMode={getLlmEnv().mode} showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b px-5 py-4">

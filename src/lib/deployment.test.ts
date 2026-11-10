@@ -38,10 +38,14 @@ describe("production deployment commands", () => {
     expect(startCommand).not.toMatch(/--accept-data-loss|--force/);
   });
 
-  it("DEMO_PUBLIC is set to 1 in render.yaml (D56)", () => {
-    // The render.yaml must have DEMO_PUBLIC: "1" so judges need no login.
-    expect(renderConfig).toMatch(/DEMO_PUBLIC/);
-    expect(renderConfig).toMatch(/value:\s*["']?1["']?/);
+  it("declares the public Singapore Sandbox deployment without committing credentials (D59)", () => {
+    expect(renderConfig).toMatch(/^    region: singapore$/m);
+    expect(renderConfig).toMatch(/- key: DEMO_PUBLIC\r?\n +value: "1"$/m);
+    expect(renderConfig).toMatch(/- key: PAYPAL_MODE\r?\n +value: sandbox$/m);
+    for (const key of ["TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN", "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET",
+      "PAYPAL_SANDBOX_MERCHANT_EMAIL", "PAYPAL_SANDBOX_BUYER_EMAIL", "PAYPAL_WEBHOOK_ID"]) {
+      expect(renderConfig).toMatch(new RegExp(`- key: ${key}\\r?\\n +sync: false$`, "m"));
+    }
   });
 
   it("keeps the demo seed as an explicit manual command", () => {

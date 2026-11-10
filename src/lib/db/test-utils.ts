@@ -1,8 +1,7 @@
 import { openDb, type AppDb } from "./client";
 
 /** Test-only in-memory schema; tests must never use the app's ./data database. */
-export function createTestDb(): AppDb {
-  const database = openDb(":memory:");
+export function createTestDb(database = openDb(":memory:")): AppDb {
   database.$client.exec(`
     CREATE TABLE owner_policy (
       id text PRIMARY KEY, min_deposit_percent integer NOT NULL, max_installments integer NOT NULL,

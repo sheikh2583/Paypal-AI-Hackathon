@@ -6,7 +6,7 @@ import { ScriptedLLM } from '@/lib/llm';
 import { applyClassification } from '@/lib/agent/classify';
 import { runAgent } from '@/lib/agent/run';
 import { scripts } from '@/lib/agent/scripts';
-import { guardDemoRoute } from '@/lib/demo';
+import { guardDemoRoute, withDemoMutation } from '@/lib/demo';
 
 const inputSchema = z.object({ invoiceId: z.string().min(1) }).strict();
 
@@ -19,7 +19,10 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = inputSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: { code: 'VALIDATION_ERROR', message: 'invoiceId is required.' } }, { status: 400 });
 
-  const { invoiceId } = parsed.data;
+  return withDemoMutation('step', () => runDemoStep(parsed.data.invoiceId));
+}
+
+async function runDemoStep(invoiceId: string): Promise<Response> {
   const invoice = getInvoice(invoiceId, db);
   if (!invoice) return Response.json({ error: { code: 'INVOICE_NOT_FOUND', message: 'Invoice was not found.' } }, { status: 404 });
   const client = getClient(invoice.clientId, db);

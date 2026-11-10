@@ -229,10 +229,10 @@ All owner pages, mock invoice pages, and mutation APIs require a verified single
 | `POST /api/webhooks/paypal` | PayPal event, signed in Sandbox or `X-Chaser-Mock-Webhook: 1` in mock | `200 {received: true}` after recording the event ID. Invalid signatures return `400`, verification outages return `503`, and unsupported methods such as GET return `405`. No owner session required. |
 | `GET /api/events` | – | `text/event-stream` with JSON `data:` frames of `{type, invoiceId?, at}`, a comment heartbeat every 15 s, and browser reconnect. Requires workspace access. |
 | `POST /api/demo/step` | `{invoiceId}` | advance one persisted scripted Dana step |
-| `POST /api/demo/reset` | `{}` | mock mode only, reseeds fictional demo data and resets the demo clock |
+| `POST /api/demo/reset` | `{}` | Reseeds fictional business data and resets the demo clock. Public mode supports Turso and Sandbox, preserves auth, and attempts to cancel unpaid app-issued installments after responding. Private reset requires local SQLite and mock mode. |
 | `POST /api/demo/simulate-payment` | `{invoiceId, amountCents?}` | Local invoice ID. Mock applies the payment and reconciles. Sandbox reconciles and returns `409` with instructions to pay on PayPal. |
 | `POST /api/demo/advance-time` | `{days}` | Adds 1–365 whole days to the demo clock, recomputes overdue status, and refreshes risk on open invoices. Returns `{now, overdueUpdated, refreshed, message}`. |
 
-Demo routes return `404` in production unless `DEMO_PUBLIC=1`. Enabled routes retain the workspace access gate. In an active plan, paid installment count comes from the invoice rows. When all installments are paid, the plan and the original invoice's chase state become `RESOLVED`. The original payment status stays `SUPERSEDED` so installment amounts are counted once.
+Demo routes return `404` in production unless `DEMO_PUBLIC=1`. Enabled routes use the workspace access gate, which permits guests in public mode. Public demo mutations are rate-limited per process and return `429` with `Retry-After` if busy or cooling down. In an active plan, paid installment count comes from the invoice rows. When all installments are paid, the plan and the original invoice's chase state become `RESOLVED`. The original payment status stays `SUPERSEDED` so installment amounts are counted once.
 
 Error shape for all routes: `{ error: { code: string, message: string } }` with an appropriate HTTP status.

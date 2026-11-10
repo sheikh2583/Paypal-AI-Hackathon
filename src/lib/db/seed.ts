@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { getDatabaseEnv, getPayPalEnv } from "../env";
+import { getAppEnv, getDatabaseEnv, getPayPalEnv } from "../env";
 import { getNow } from "../clock";
 import type { AppDb } from "./client";
 import { db } from "./client";
@@ -153,6 +153,11 @@ export interface SeedOptions {
   sandboxBuyerEmail?: string;
 }
 
+const businessTables = [
+  "messages", "approvals", "audit_log", "webhook_events", "mock_paypal_invoices",
+  "plans", "invoices", "clients", "owner_policy", "kv",
+] as const;
+
 function isoAtDaysBefore(now: Date, days: number): string {
   return new Date(now.getTime() - days * DAY_MS).toISOString();
 }
@@ -165,21 +170,19 @@ export async function seedDatabase(
   if (database === db && getDatabaseEnv().mode === "turso") {
     throw new Error("Full demo reset is unavailable on the hosted Turso database.");
   }
+  return replaceBusinessSeed(database, options, suppliedNow);
+}
+
+export async function resetPublicDemoSeed(database: AppDb, options: SeedOptions): Promise<SeededInvoiceSummary[]> {
+  if (!getAppEnv().demoPublic) throw new Error("Public demo reset is disabled.");
+  return replaceBusinessSeed(database, options);
+}
+
+async function replaceBusinessSeed(database: AppDb, options: SeedOptions, suppliedNow?: Date) {
   const seed = database.$client.transaction(() => {
-    database.$client.exec(`
-      DELETE FROM messages;
-      DELETE FROM approvals;
-      DELETE FROM audit_log;
-      DELETE FROM webhook_events;
-      DELETE FROM mock_paypal_invoices;
-      DELETE FROM plans;
-      DELETE FROM invoices;
-      DELETE FROM clients;
-      DELETE FROM owner_policy;
-      DELETE FROM kv;
-    `);
+    database.$client.exec(businessTables.map((table) => `DELETE FROM ${table};`).join("\n"));
     return insertSeedRows(database, options, suppliedNow);
-  })();
+  }).immediate();
   return refreshSeededInvoices(database, seed);
 }
 
@@ -385,6 +388,13 @@ export async function seedIfEmpty(
     const row = database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number };
     if (row.count > 0) {
       console.log(`seedIfEmpty: ${row.count} invoice(s) already present — skipping seed.`);
+      return;
+    }
+    const remainingTables = businessTables.filter((table) => table !== "invoices");
+    const hasRows = remainingTables.map((table) => `SELECT 1 FROM ${table}`).join(" UNION ALL ");
+    const leftovers = database.$client.prepare(`SELECT EXISTS(${hasRows}) AS present`).get() as { present: number };
+    if (leftovers.present) {
+      console.warn("seedIfEmpty: invoices is empty but other business tables contain records. Skipping seed to preserve them.");
       return;
     }
     return insertSeedRows(database, options);

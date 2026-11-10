@@ -1,6 +1,7 @@
 // Agent tool definitions and handlers. Each tool is Zod-validated on input,
 // calls only sanctioned DB/PayPal paths, and writes an audit row (hard rule 5).
 // Money is always integer cents (hard rule 1). Contracts in docs/04.
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { AppDb } from '../db/client';
 import { invoices as invoicesTable } from '../db/schema';
@@ -32,7 +33,7 @@ import {
   updatePlan,
 } from '../db/queries';
 import type { ToolDefinition } from '../llm';
-import { getLlmEnv } from '../env';
+import { getLlmEnv, getPayPalEnv } from '../env';
 
 // ---------------------------------------------------------------------------
 // Helpers: functions not yet in queries.ts
@@ -542,6 +543,10 @@ async function handleCreatePlanInvoices(
   }
 
   const paypal = paypalOverride ?? getPayPal();
+  // Sandbox retains old invoice numbers after a reset. Keep retries stable within each plan.
+  const sandboxPlanSuffix = getPayPalEnv().mode === 'sandbox'
+    ? createHash('sha256').update(plan.id).digest('hex').slice(0, 12)
+    : null;
   const createdPayPalIds: string[] = [];
 
   type LocalInstallment = {
@@ -558,12 +563,13 @@ async function handleCreatePlanInvoices(
   // Create and send one PayPal invoice per installment.
   for (const inst of rebased.installments) {
     const requestId = `${plan.id}-${inst.no}`;
+    const suffix = `-P${inst.no}${sandboxPlanSuffix ? `-${sandboxPlanSuffix}` : ''}`;
     try {
       const ppInvoice = await paypal.createInvoice({
         requestId,
         clientName: client.name,
         clientEmail: client.email,
-        number: `${invoice.number}-P${inst.no}`,
+        number: sandboxPlanSuffix ? `${invoice.number.slice(0, 25 - suffix.length)}${suffix}` : `${invoice.number}${suffix}`,
         description: `${invoice.description} — Installment ${inst.no} of ${rebased.installments.length}`,
         amountCents: inst.amountCents,
         dueAt: inst.dueAt,

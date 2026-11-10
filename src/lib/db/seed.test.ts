@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { seedDatabase } from "./seed";
 import { closeTestDb, createTestDb } from "./test-utils";
 
@@ -243,18 +243,21 @@ describe("seedIfEmpty (D56)", () => {
     }
   });
 
-  it("preserves webhook history when adding invoices to an empty workspace", async () => {
+  it.each([
+    ["webhook_events", "INSERT INTO webhook_events (id, event_type, payload_json, received_at) VALUES ('existing-event', 'INVOICING.INVOICE.CREATED', '{}', '2026-11-10T00:00:00.000Z')"],
+    ["clients", "INSERT INTO clients (id, name, email, responsiveness) VALUES ('existing-client', 'Demo', 'demo@example.com', 'high')"],
+  ])("skips startup seeding and preserves %s when there are no invoices", async (table, insert) => {
     const { seedIfEmpty } = await import("./seed");
     const database = createTestDb();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      database.$client.prepare(
-        "INSERT INTO webhook_events (id, event_type, payload_json, received_at) VALUES (?, ?, ?, ?)",
-      ).run("existing-event", "INVOICING.INVOICE.CREATED", "{}", "2026-11-10T00:00:00.000Z");
-
-      expect(await seedIfEmpty(database, { paypalMode: "mock" })).toBe(true);
-      expect(database.$client.prepare("SELECT id FROM webhook_events").all())
-        .toEqual([{ id: "existing-event" }]);
+      database.$client.exec(insert);
+      expect(await seedIfEmpty(database, { paypalMode: "mock" })).toBe(false);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("other business tables contain records"));
+      expect(database.$client.prepare(`SELECT id FROM ${table}`).all()).toHaveLength(1);
+      expect(database.$client.prepare("SELECT id FROM invoices").all()).toEqual([]);
     } finally {
+      warn.mockRestore();
       closeTestDb(database);
     }
   });

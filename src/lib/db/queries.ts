@@ -143,6 +143,14 @@ export function getInvoice(id: string, database: AppDb = db): InvoiceRow | undef
   return row ? mapInvoice(row) : undefined;
 }
 
+export function listIssuedPayPalInstallmentIds(database: AppDb = db): string[] {
+  const rows = database.select({ id: invoices.paypalInvoiceId }).from(invoices)
+    .innerJoin(plans, and(eq(invoices.planId, plans.id), eq(invoices.parentInvoiceId, plans.invoiceId)))
+    .where(and(isNotNull(invoices.installmentNo), eq(invoices.paidCents, 0), notInArray(invoices.status, ["PAID", "PARTIALLY_PAID"])))
+    .all();
+  return [...new Set(rows.flatMap(({ id }) => id && /^INV2-[A-Z0-9-]+$/.test(id) ? [id] : []))];
+}
+
 export function getInvoiceByPayPalId(paypalInvoiceId: string, database: AppDb = db): InvoiceRow | undefined {
   const row = database.select().from(invoices).where(eq(invoices.paypalInvoiceId, paypalInvoiceId)).limit(1).all()[0];
   return row ? mapInvoice(row) : undefined;

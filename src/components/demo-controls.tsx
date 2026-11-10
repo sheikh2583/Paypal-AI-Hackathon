@@ -11,6 +11,7 @@ interface DemoControlsProps {
   llmMode: "scripted" | "live";
   showTimeControls?: boolean;
   compact?: boolean;
+  showReset?: boolean;
   stepComplete?: boolean;
   progressStep?: 0 | 1 | 2 | 3;
   paymentAmountCents?: number;
@@ -22,7 +23,7 @@ const demoSteps = ["Send reminder", "Hear Dana’s reply", "Agree and issue plan
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
 export function DemoControls({
-  invoiceId, paymentInvoiceId, paypalMode, llmMode, showTimeControls = false,
+  invoiceId, paymentInvoiceId, paypalMode, llmMode, showTimeControls = false, showReset = false,
   compact = false, stepComplete = false, progressStep = 0, paymentAmountCents, depositPayment = false, paymentComplete = false,
 }: DemoControlsProps) {
   const router = useRouter();
@@ -101,7 +102,7 @@ export function DemoControls({
           {busy === `time-${days}` ? <LoaderCircle className="size-4 animate-spin" /> : <Clock3 className="size-4" />}
           Advance time +{days} days
         </button>) : null}
-        {!compact && paypalMode === "mock" ? <button type="button" disabled={busy !== null} onClick={() => setConfirmReset(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
+        {!compact && showReset ? <button type="button" disabled={busy !== null} onClick={() => setConfirmReset(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
           {busy === "reset" ? <LoaderCircle className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
           Reset demo
         </button> : null}
