@@ -1,10 +1,13 @@
 import { AppNav } from "@/components/app-nav";
 import { LiveUpdates } from "@/components/live-updates";
 import { getDemoSession } from "@/lib/auth";
+import { getAppEnv, getLlmEnv } from "@/lib/env";
 import { redirect } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!(await getDemoSession())) redirect("/login");
+  const { demoPublic } = getAppEnv();
+  const { mode } = getLlmEnv();
   return (
     <div className="min-h-screen md:flex">
       <LiveUpdates />
@@ -19,11 +22,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mb-3 px-3 md:mb-6">
           <p className="text-lg font-semibold tracking-tight">Chaser</p>
           <p className="hidden text-xs text-muted-foreground md:block">Invoice collections agent</p>
+          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{mode === "live" ? "Live AI" : "Scripted replies"}</p>
         </div>
-        <AppNav />
+        <AppNav demoPublic={demoPublic} />
       </aside>
 
-      <main id="main" className="min-w-0 flex-1 p-4 md:p-8">
+      <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>

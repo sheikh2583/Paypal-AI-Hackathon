@@ -29,7 +29,7 @@ function isActive(pathname: string, item: NavItem): boolean {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export function AppNav() {
+export function AppNav({ demoPublic }: { demoPublic: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -51,7 +51,7 @@ export function AppNav() {
   }
 
   return (
-    <nav aria-label="Main" className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+    <nav aria-label="Main" className="grid grid-cols-2 gap-1 md:flex md:flex-col">
       {NAV_ITEMS.map((item) => {
         const active = isActive(pathname, item);
         const Icon = item.icon;
@@ -72,10 +72,10 @@ export function AppNav() {
           </Link>
         );
       })}
-      <button type="button" onClick={() => void signOut()} disabled={busy} className="ml-auto flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60 md:ml-0 md:mt-4 md:border-t md:pt-5">
+      {!demoPublic ? <button type="button" onClick={() => void signOut()} disabled={busy} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60 md:mt-4 md:border-t md:pt-5">
         {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
         {busy ? "Signing out…" : "Sign out"}
-      </button>
+      </button> : null}
       {error ? <span role="alert" className="basis-full px-3 text-xs text-destructive md:basis-auto">{error}</span> : null}
     </nav>
   );

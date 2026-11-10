@@ -6,9 +6,9 @@ import { Check, Clock3, CreditCard, LoaderCircle, Play, RotateCcw } from "lucide
 
 interface DemoControlsProps {
   invoiceId?: string;
+  priyaAction?: { invoiceId: string; counter?: boolean };
   paymentInvoiceId?: string;
   paypalMode: "mock" | "sandbox";
-  llmMode: "scripted" | "live";
   showTimeControls?: boolean;
   compact?: boolean;
   showReset?: boolean;
@@ -23,7 +23,7 @@ const demoSteps = ["Send reminder", "Hear Dana’s reply", "Agree and issue plan
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
 export function DemoControls({
-  invoiceId, paymentInvoiceId, paypalMode, llmMode, showTimeControls = false, showReset = false,
+  invoiceId, priyaAction, paymentInvoiceId, paypalMode, showTimeControls = false, showReset = false,
   compact = false, stepComplete = false, progressStep = 0, paymentAmountCents, depositPayment = false, paymentComplete = false,
 }: DemoControlsProps) {
   const router = useRouter();
@@ -41,7 +41,7 @@ export function DemoControls({
       const result = await response.json() as { error?: { message?: string }; run?: { summary?: string }; reply?: string; message?: string; status?: string; reset?: boolean };
       if (!response.ok) throw new Error(result.error?.message ?? "The demo action failed.");
       const runSummary = result.run?.summary;
-      const detail = runSummary ? `${result.reply ? `Dana: “${result.reply}” ` : ""}${runSummary}` : result.message ?? (result.status ? `Mock PayPal now shows ${result.status.toLowerCase()}.` : result.reply ? `Client reply: “${result.reply}”` : result.reset ? "Demo reset. Start with Dana’s reminder." : "Demo step complete.");
+      const detail = runSummary ? `${result.reply ? `${priyaAction ? "Priya" : "Dana"}: “${result.reply}” ` : ""}${runSummary}` : result.message ?? (result.status ? `Mock PayPal now shows ${result.status.toLowerCase()}.` : result.reply ? `Client reply: “${result.reply}”` : result.reset ? "Demo reset. Start with Dana’s reminder." : "Demo step complete.");
       setFeedback(detail);
       router.refresh();
     } catch (cause) {
@@ -82,7 +82,7 @@ export function DemoControls({
     <div className={compact ? "space-y-2" : "rounded-2xl border bg-card p-5 shadow-sm"}>
       {!compact ? <div className="mb-4">
         <p className="text-sm font-semibold">{invoiceId ? "Walk through Dana’s payment plan" : "Demo controls"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">PayPal {paypalMode} · LLM {llmMode}{invoiceId ? " · Dana’s walkthrough uses scripted replies" : ""}</p>
+        <p className="mt-1 text-sm text-muted-foreground">PayPal {paypalMode}{invoiceId ? " · Guided replies are scripted" : ""}</p>
       </div> : null}
       {invoiceId ? <ol aria-label="Dana demo progress" className="mb-4 grid gap-2 sm:grid-cols-3">{demoSteps.map((label, index) => {
         const complete = progressStep > index;
@@ -94,10 +94,16 @@ export function DemoControls({
           {busy === "step" ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
           {busy === "step" ? "Running step…" : stepComplete ? "Plan issued" : progressStep === 0 ? "Start with a reminder" : progressStep === 1 ? "Continue to Dana’s reply" : "Confirm plan and create invoices"}
         </button> : null}
-        {paymentInvoiceId && paypalMode === "mock" ? <button type="button" disabled={busy !== null} onClick={() => void post("/api/demo/simulate-payment", { invoiceId: paymentInvoiceId }, "pay")} className="inline-flex min-h-10 items-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:cursor-wait disabled:opacity-60">
-          {busy === "pay" ? <LoaderCircle className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
-          Simulate{paymentAmountCents === undefined ? "" : ` ${money(paymentAmountCents)}`}{depositPayment ? " deposit" : ""} payment
+        {priyaAction ? <button type="button" disabled={busy !== null} onClick={() => void post("/api/demo/step", { invoiceId: priyaAction.invoiceId, ...(priyaAction.counter ? { action: "priya-counter" } : {}) }, "priya")} className="inline-flex min-h-10 items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+          {busy === "priya" ? "Running step…" : priyaAction.counter ? "Send 5% goodwill counter" : "Simulate Priya’s 40% discount request"}
         </button> : null}
+        {paymentInvoiceId && paypalMode === "mock" ? <div className="relative inline-grid">
+          <button type="button" disabled={busy !== null || paymentComplete} aria-hidden={paymentComplete || undefined} onClick={() => void post("/api/demo/simulate-payment", { invoiceId: paymentInvoiceId }, "pay")} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:cursor-wait disabled:opacity-60 ${paymentComplete ? "invisible" : ""}`}>
+            {busy === "pay" ? <LoaderCircle className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+            Simulate{paymentAmountCents === undefined ? "" : ` ${money(paymentAmountCents)}`}{depositPayment ? " deposit" : ""} payment
+          </button>
+          {paymentComplete ? <p role="status" className="absolute inset-0 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 text-sm font-semibold text-emerald-800"><Check aria-hidden="true" className="size-4" /> Deposit paid</p> : null}
+        </div> : null}
         {showTimeControls ? [7, 30].map((days) => <button key={days} type="button" disabled={busy !== null} onClick={() => void post("/api/demo/advance-time", { days }, `time-${days}`)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-60">
           {busy === `time-${days}` ? <LoaderCircle className="size-4 animate-spin" /> : <Clock3 className="size-4" />}
           Advance time +{days} days
@@ -107,7 +113,7 @@ export function DemoControls({
           Reset demo
         </button> : null}
       </div>
-      {paymentComplete ? <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">Deposit paid. Dana’s plan walkthrough is complete.</p> : null}
+      {paymentComplete && paypalMode === "sandbox" ? <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">Deposit paid. Dana’s plan walkthrough is complete.</p> : null}
       {stepComplete && (!paymentInvoiceId || paypalMode === "sandbox") && !paymentComplete ? <p className="mt-3 text-sm text-muted-foreground">Open Dana’s invoice to review the schedule and {paypalMode === "mock" ? "simulate the deposit" : "pay on the PayPal Sandbox invoice page"}.</p> : null}
       {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
       {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}

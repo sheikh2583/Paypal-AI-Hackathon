@@ -228,7 +228,7 @@ All owner pages, mock invoice pages, and mutation APIs require a verified single
 | `GET /api/audit?invoiceId=` | – | `AuditEntry[]` newest first |
 | `POST /api/webhooks/paypal` | PayPal event, signed in Sandbox or `X-Chaser-Mock-Webhook: 1` in mock | `200 {received: true}` after recording the event ID. Invalid signatures return `400`, verification outages return `503`, and unsupported methods such as GET return `405`. No owner session required. |
 | `GET /api/events` | – | `text/event-stream` with JSON `data:` frames of `{type, invoiceId?, at}`, a comment heartbeat every 15 s, and browser reconnect. Requires workspace access. |
-| `POST /api/demo/step` | `{invoiceId}` | advance one persisted scripted Dana step |
+| `POST /api/demo/step` | `{invoiceId, action?: 'priya-counter'}` | Advances the guided Dana flow or simulates Priya’s discount request. The demo-only counter requires Priya’s pending approval and a 5% discount within policy. |
 | `POST /api/demo/reset` | `{}` | Reseeds fictional business data and resets the demo clock. Public mode supports Turso and Sandbox, preserves auth, and attempts to cancel unpaid app-issued installments after responding. Private reset requires local SQLite and mock mode. |
 | `POST /api/demo/simulate-payment` | `{invoiceId, amountCents?}` | Local invoice ID. Mock applies the payment and reconciles. Sandbox reconciles and returns `409` with instructions to pay on PayPal. |
 | `POST /api/demo/advance-time` | `{days}` | Adds 1–365 whole days to the demo clock, recomputes overdue status, and refreshes risk on open invoices. Returns `{now, overdueUpdated, refreshed, message}`. |

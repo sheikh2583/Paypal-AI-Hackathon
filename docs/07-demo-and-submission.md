@@ -36,7 +36,7 @@ Elena's plan exceeds the auto-approve threshold, so her journey demonstrates the
 
 **1:30–2:10 — PayPal.** In the default mock mode, select “Simulate $270 deposit payment” on Dana's invoice. Show the deposit change to paid and the installment plan remain active. This is a deterministic mock payment, not a real PayPal transaction. If presenting a separately configured Sandbox run, use the PayPal Sandbox invoice page and buyer account instead.
 
-**2:10–2:40 — Safety (Priya).** Priya demands a 40% discount. Agent does not promise anything and escalates (`DISCOUNT_REQUEST`). In the Approvals inbox Maya declines the 40% and sends a 5% goodwill counter instead (within policy, but her call); Chaser relays it to Priya.
+**2:10–2:40 — Safety (Priya).** Open **Approvals**, follow **Open Priya’s demo invoice**, and select **Simulate Priya’s 40% discount request**. Chaser escalates it as `DISCOUNT_REQUEST`. Return to **Approvals** and select **Send 5% goodwill counter**. Chaser relays the owner’s offer, and the decision appears in the audit log.
 
 **2:40–3:00 — Trust.** Open the Audit log: every tool call and policy decision with timestamps. Close with the one-line value prop and "Built with PayPal Invoicing and Claude."
 
@@ -44,7 +44,7 @@ Backup path for the full walkthrough: `PAYPAL_MODE=mock` and scripted LLM mode, 
 
 ### Presenter setup and click path
 
-1. Configure `AUTH_OWNER_EMAIL`, a private `BETTER_AUTH_SECRET` (at least 32 characters), `RESEND_API_KEY`, and `RESEND_FROM`. `APP_BASE_URL` is used to create email links. Start with `pnpm dev`, open `/setup`, create the one owner account, verify the email link, then sign in with the password and emailed OTP. No public demo credentials are provided.
+1. Use the [no-key mock quick start](../README.md#quick-start) locally. On the hosted demo, open the dashboard with `DEMO_PUBLIC=1`. For a private workspace, configure owner authentication and sign in through `/setup` and `/login`.
 2. The Dashboard shows the five fictional overdue invoices, risk levels, current chase states, and next actions. Use the Policy page to explain the owner's boundaries.
 3. In “Walk through Dana’s payment plan,” the three highlighted stages show progress. Click the stage-specific button once per step; the latest action and any scripted client reply appear below it. The plan numbers are generated under policy and should be explained as a $270 deposit plus two $315 installments.
 4. Open Dana's invoice to show the conversation and installment schedule. Click the clearly labelled mock deposit payment button to finish the payment segment. Use “Reset demo” after the presentation to open the in-app confirmation dialog, restore the fictional seed state, and clear the accumulated demo activity.

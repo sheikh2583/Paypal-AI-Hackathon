@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import LibSqlite from "libsql";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppDb } from "./db/client";
-import { getInvoice, listAudit } from "./db/queries";
+import { getInvoice, getMessages, getPolicy, listApprovals, listAudit, upsertPolicy } from "./db/queries";
 import { schema } from "./db/schema";
 import { closeTestDb, createTestDb } from "./db/test-utils";
 import type { PayPalClient, PayPalInvoice } from "./types";
@@ -66,6 +66,33 @@ afterEach(() => {
 });
 
 describe("public demo replay with native libSQL", () => {
+  it("relays Priya’s owner counter only after an eligible dispute and under the current cap", async () => {
+    const { POST: reset } = await import("@/app/api/demo/reset/route");
+    const { POST: step } = await import("@/app/api/demo/step/route");
+    const invoiceId = "invoice-priya-600";
+    const counter = { invoiceId, action: "priya-counter" };
+    expect((await reset(post("reset"))).status).toBe(200);
+    expect((await step(post("step", counter))).status).toBe(409);
+    vi.setSystemTime(Date.now() + 1_000);
+    expect((await step(post("step", { invoiceId }))).status).toBe(200);
+    expect(listApprovals("PENDING", database)).toEqual([expect.objectContaining({ kind: "DISCOUNT_REQUEST", invoiceId })]);
+
+    const policy = getPolicy(database)!;
+    upsertPolicy({ ...policy, maxDiscountPercent: 4 }, database);
+    vi.setSystemTime(Date.now() + 1_000);
+    expect((await step(post("step", counter))).status).toBe(409);
+    expect(getMessages(invoiceId, database).filter(({ direction }) => direction === "agent_to_client")).toHaveLength(0);
+    upsertPolicy(policy, database);
+    vi.setSystemTime(Date.now() + 1_000);
+    expect((await step(post("step", counter))).status).toBe(200);
+    expect(listApprovals("EDITED", database)).toHaveLength(1);
+    expect(getMessages(invoiceId, database).filter(({ direction }) => direction === "agent_to_client"))
+      .toEqual([expect.objectContaining({ body: expect.stringContaining("5% goodwill discount") })]);
+    expect(listAudit(invoiceId, database)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ actor: "owner", action: "demo.approval.counter", ok: true }),
+    ]));
+  });
+
   it("replays Dana without login, preserves auth, and only cancels unpaid linked installments", async () => {
     const { POST: reset } = await import("@/app/api/demo/reset/route");
     const { POST: step } = await import("@/app/api/demo/step/route");

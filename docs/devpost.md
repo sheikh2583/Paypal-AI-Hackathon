@@ -2,7 +2,7 @@
 
 I'll pay you Friday. Friday rarely comes.
 
-**Elevator pitch (155 characters):** “I’ll pay you Friday.” Friday never came. Chaser is the AI that chases overdue invoices for you, politely, and can’t promise anything you haven’t approved.
+**Elevator pitch:** “I’ll pay you Friday.” Friday never came. Chaser is the AI that chases overdue invoices for you, politely, and can’t promise anything you haven’t approved.
 
 ## Inspiration
 
@@ -46,4 +46,4 @@ Next.js, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth, Turso/l
 
 ## AI-tool disclosure to confirm
 
-The repository contains instructions that name Claude Code, Cursor, GitHub Copilot, and Codex, plus a `.kiro/specs` directory. Before submitting, confirm which tools were actually used and update this disclosure to match the hackathon's required format. The package does not claim that these tools are part of the runtime.
+Repo evidence: `AGENTS.md` names Claude Code, Cursor, GitHub Copilot, and Codex; `.kiro/specs/` contains a Kiro spec. These repository artifacts do not prove the complete tool history. I must confirm the final tool list and use the hackathon's required disclosure format. These tools are not part of the runtime.

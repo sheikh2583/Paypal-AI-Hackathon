@@ -7,8 +7,9 @@ import { applyClassification } from '@/lib/agent/classify';
 import { runAgent } from '@/lib/agent/run';
 import { scripts } from '@/lib/agent/scripts';
 import { guardDemoRoute, withDemoMutation } from '@/lib/demo';
+import { runPriyaDemoStep } from '@/lib/demo-priya';
 
-const inputSchema = z.object({ invoiceId: z.string().min(1) }).strict();
+const inputSchema = z.object({ invoiceId: z.string().min(1), action: z.literal('priya-counter').optional() }).strict();
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await guardDemoRoute();
@@ -19,16 +20,20 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = inputSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: { code: 'VALIDATION_ERROR', message: 'invoiceId is required.' } }, { status: 400 });
 
-  return withDemoMutation('step', () => runDemoStep(parsed.data.invoiceId));
+  return withDemoMutation('step', () => runDemoStep(parsed.data.invoiceId, parsed.data.action));
 }
 
-async function runDemoStep(invoiceId: string): Promise<Response> {
+async function runDemoStep(invoiceId: string, action?: 'priya-counter'): Promise<Response> {
   const invoice = getInvoice(invoiceId, db);
   if (!invoice) return Response.json({ error: { code: 'INVOICE_NOT_FOUND', message: 'Invoice was not found.' } }, { status: 404 });
   const client = getClient(invoice.clientId, db);
   const script = client?.persona ? scripts[client.persona] : undefined;
-  if (!client || !script || client.persona !== 'dana') {
-    return Response.json({ error: { code: 'DEMO_FLOW_UNAVAILABLE', message: 'The guided demo currently supports Dana’s invoice.' } }, { status: 400 });
+  if (invoiceId === 'invoice-priya-600' && client?.persona === 'priya') {
+    try { return await runPriyaDemoStep(invoice, db, action === 'priya-counter'); }
+    catch { return Response.json({ error: { code: 'DEMO_STEP_FAILED', message: 'Priya’s demo step could not complete. Try again.' } }, { status: 500 }); }
+  }
+  if (action || !client || !script || client.persona !== 'dana') {
+    return Response.json({ error: { code: 'DEMO_FLOW_UNAVAILABLE', message: 'The guided demo supports Dana’s plan and Priya’s discount request.' } }, { status: 400 });
   }
 
   const replies = getMessages(invoiceId, db).filter((message) => message.direction === 'client_to_agent');

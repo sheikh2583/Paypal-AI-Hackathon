@@ -8,7 +8,7 @@ import { getMessages, listApprovals, listPlansByInvoiceId } from "@/lib/db/queri
 import { getNow } from "@/lib/clock";
 import { getDemoSession } from "@/lib/auth";
 import { demoEnabled, demoResetAvailable } from "@/lib/demo";
-import { getLlmEnv, getPayPalEnv } from "@/lib/env";
+import { getPayPalEnv } from "@/lib/env";
 import { listInvoiceItems } from "@/lib/invoice-list";
 import { reconcilePayPalOnRead } from "@/lib/paypal/poll";
 
@@ -22,7 +22,8 @@ export default async function DashboardPage() {
   const now = getNow();
   const pending = listApprovals("PENDING", db);
   const allInvoices = listInvoiceItems(db, now, pending);
-  const rows = allInvoices.filter(({ invoice }) => !invoice.parentInvoiceId && invoice.status !== "PAID");
+  const rows = allInvoices.filter(({ invoice }) => !invoice.parentInvoiceId && invoice.status !== "PAID")
+    .sort((a, b) => (b.invoice.riskScore ?? 0) - (a.invoice.riskScore ?? 0));
   const openInvoices = allInvoices.filter(({ invoice }) => ["SENT", "OVERDUE", "PARTIALLY_PAID"].includes(invoice.status));
   const total = openInvoices.reduce((sum, { invoice }) => sum + Math.max(0, invoice.amountCents - invoice.paidCents), 0);
   const dana = rows.find(({ invoice }) => invoice.id === "invoice-dana-900");
@@ -42,7 +43,7 @@ export default async function DashboardPage() {
         <SummaryCard icon={ShieldCheck} label="Policy guardrails" value="Active" detail="30% deposit · max 3 installments · 5% discount" />
       </section>
 
-      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paypalMode={paypalMode} llmMode={getLlmEnv().mode} showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
+      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paypalMode={paypalMode} showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b px-5 py-4">
@@ -51,16 +52,16 @@ export default async function DashboardPage() {
         </div>
         {rows.length === 0 ? <div className="p-8 text-center"><p className="font-medium">No demo invoices found</p><p className="mt-1 text-sm text-muted-foreground">Reset the demo to restore the seeded scenario.</p></div> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-5 py-3 font-medium">Client / invoice</th><th className="px-4 py-3 font-medium">Amount due</th><th className="px-4 py-3 font-medium">Risk</th><th className="px-4 py-3 font-medium">Chase state</th><th className="px-5 py-3 font-medium">Next action</th></tr></thead>
+            <table className="w-full text-left text-sm lg:min-w-[720px]">
+              <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3 font-medium sm:px-5">Client / invoice</th><th className="px-3 py-3 font-medium sm:px-4">Amount due</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Risk</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Chase state</th><th className="hidden px-5 py-3 font-medium lg:table-cell">Next action</th></tr></thead>
               <tbody className="divide-y">
                 {rows.map(({ invoice, client, nextAction: action, riskLabel }) => {
                   return <tr key={invoice.id} className="transition hover:bg-secondary/30">
-                    <td className="px-5 py-4"><Link href={`/invoices/${invoice.id}`} className="group flex items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-semibold text-accent-foreground">{client.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span><span className="block font-semibold group-hover:text-primary">{client.name}<ArrowRight className="ml-1 inline size-3 opacity-0 transition group-hover:opacity-100" /></span><span className="mt-0.5 block text-xs text-muted-foreground">{invoice.number} · {invoice.description}</span></span></Link></td>
-                    <td className="px-4 py-4 font-semibold tabular-nums">{invoice.status === "SUPERSEDED" ? "In payment plan" : money(invoice.amountCents - invoice.paidCents)}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">{invoice.status === "SUPERSEDED" ? "Replaced by installments" : `Due ${new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</span></td>
-                    <td className="px-4 py-4"><span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${riskLabel === "High" ? "bg-red-50 text-red-700" : riskLabel === "Medium" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}><span className="size-1.5 rounded-full bg-current" />{riskLabel} · {invoice.riskScore}</span></td>
-                    <td className="px-4 py-4"><span className="rounded-md bg-secondary px-2 py-1 text-xs">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</span></td>
-                    <td className="px-5 py-4"><Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="ml-1 inline size-3.5" /></Link></td>
+                    <td className="px-3 py-4 sm:px-5"><Link href={`/invoices/${invoice.id}`} className="group flex items-center gap-3"><span className="hidden size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-semibold text-accent-foreground sm:grid">{client.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span><span className="block font-semibold group-hover:text-primary">{client.name}<ArrowRight className="ml-1 inline size-3 opacity-0 transition group-hover:opacity-100" /></span><span className="mt-0.5 block text-xs text-muted-foreground">{invoice.number} · {invoice.description}</span></span></Link></td>
+                    <td className="px-3 py-4 font-semibold tabular-nums sm:px-4">{invoice.status === "SUPERSEDED" ? "In payment plan" : money(invoice.amountCents - invoice.paidCents)}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">{invoice.status === "SUPERSEDED" ? "Replaced by installments" : `Due ${new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</span></td>
+                    <td className="hidden px-4 py-4 lg:table-cell"><span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${riskLabel === "High" ? "bg-red-50 text-red-700" : riskLabel === "Medium" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}><span className="size-1.5 rounded-full bg-current" />{riskLabel} · {invoice.riskScore}</span></td>
+                    <td className="hidden px-4 py-4 lg:table-cell"><span className="rounded-md bg-secondary px-2 py-1 text-xs">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</span></td>
+                    <td className="hidden px-5 py-4 lg:table-cell"><Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="ml-1 inline size-3.5" /></Link></td>
                   </tr>;
                 })}
               </tbody>
@@ -75,5 +76,5 @@ export default async function DashboardPage() {
 }
 
 function SummaryCard({ icon: Icon, label, value, detail }: { icon: typeof CircleDollarSign; label: string; value: string; detail: string }) {
-  return <div className="rounded-2xl border bg-card p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label}</span><span className="grid size-9 place-items-center rounded-xl bg-accent text-primary"><Icon className="size-4" /></span></div><p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
+  return <div className="rounded-2xl border bg-card p-4 shadow-sm"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label}</span><span className="grid size-9 place-items-center rounded-xl bg-accent text-primary"><Icon className="size-4" /></span></div><p className="mt-3 text-3xl font-semibold tracking-tight tabular-nums">{value}</p><p className="mt-1 text-sm text-muted-foreground">{detail}</p></div>;
 }
