@@ -1,1 +1,88 @@
-# Paypal-AI-Hackathon
+# Chaser
+
+Chaser is an AI collections agent for freelancers and micro-businesses: it follows up on overdue PayPal invoices, proposes payment plans inside owner-defined limits, creates installment invoices, and leaves an auditable trail of every decision. The project is designed around a deterministic safety boundary: the language model may propose an action, but validated tools and policy code decide whether money-moving work is allowed.
+
+![Chaser dashboard](docs/screenshots/dashboard.png)
+
+## What is here
+
+- A risk-ranked dashboard for five fictional overdue invoices.
+- A guided Dana negotiation that demonstrates a 30% deposit and two remainder installments.
+- Deterministic policy limits, owner approvals for out-of-bounds requests, and an audit log.
+- PayPal Invoicing v2 integration with a mock provider for offline demos and a Sandbox provider for configured test accounts.
+- Webhook handling plus polling reconciliation for invoice state.
+- Scripted client replies for a repeatable demo, with an adapter for a configured live LLM.
+- Better Auth owner setup for private deployments. Public demo mode bypasses the auth gate for the fictional workspace.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  UI[Next.js dashboard] --> API[App Router API]
+  API --> Agent[Agent runner]
+  Agent --> LLM[Scripted or configured LLM]
+  Agent --> Tools[Zod-validated tools]
+  Tools --> Policy[Deterministic policy]
+  Policy --> PayPal[PayPal mock or Sandbox]
+  Policy --> DB[(Turso libSQL or local SQLite)]
+  Tools --> Audit[Audit log]
+  PayPal --> Reconcile[Webhook and polling reconciler]
+  Reconcile --> DB
+```
+
+The safety pipeline is: **LLM proposes → Zod validates → policy engine decides → effect + audit**. Client text is delimited as untrusted data, and an out-of-bounds or unclear request goes to the approval inbox instead of changing policy.
+
+## Stack
+
+Next.js App Router, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth, and direct PayPal REST calls. Hosted persistence uses Turso/libSQL when both Turso variables are configured; local development and tests use a SQLite file through `better-sqlite3`.
+
+## Quick start (mock mode, no keys)
+
+Node.js 22 and pnpm 10 are recommended. From a clean clone:
+
+```sh
+pnpm install --frozen-lockfile
+node -e "require('node:fs').writeFileSync('.env.local','DATABASE_PATH=./data/chaser.db\nDEMO_PUBLIC=1\nPAYPAL_MODE=mock\nLLM_MODE=scripted\n',{flag:'wx'})"
+pnpm db:push
+pnpm auth:migrate
+pnpm db:seed-if-empty
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The seeded story is Maya Rahman's fictional workspace: five overdue invoices totaling $5,500. Mock PayPal creates fake invoice IDs and simulated payments; no money or PayPal account is used. The guided client conversation is simulated in the UI, not sent by email or SMS.
+
+For the real PayPal Sandbox client, configure the non-secret settings and credentials outside the repository, then follow [docs/runbook.md](docs/runbook.md). Keep `PAYPAL_MODE=sandbox`; never use a live PayPal URL. The Sandbox path is test money only and requires a configured Sandbox app and buyer account.
+
+Run the scripted guardrail suite with:
+
+```sh
+pnpm test:evals
+pnpm test
+```
+
+The scripted suite checks policy, tool validation, client-text wrapping, arithmetic, idempotency, tone, and audit behavior. It is not a measurement of model quality. `pnpm test:evals -- --live` uses a configured provider key when one is present.
+
+## Project structure
+
+- `src/app/` — pages and thin App Router route handlers
+- `src/components/` — dashboard, guided demo, approvals, and shared UI
+- `src/lib/agent/` — bounded agent runner and tools
+- `src/lib/policy/` — deterministic money and negotiation rules
+- `src/lib/paypal/` — mock and Sandbox clients, webhooks, and reconciliation
+- `src/lib/db/` — schema, queries, migrations, and fictional seed data
+- `src/evals/` — declarative scripted and optional live evaluation harness
+- `docs/` — product, safety, demo, runbook, and submission material
+
+## Honest limitations
+
+Client messaging is a simulated conversation. The default quick start uses mock money; a Sandbox deployment uses PayPal test accounts, not live funds. The live LLM path is optional and can vary by provider; scripted mode is used when no provider key is configured. The hosted demo uses free-tier infrastructure, so the first request can take about a minute while the service wakes. This is a single-owner demo, not a multi-tenant collections product.
+
+## Try it
+
+Open the hosted [Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com). It is free hosting, uses fictional data, and is intended to be browsed without login in public demo mode. The first load can take about a minute after the service sleeps. Owner authentication exists for private deployments but is switched off in the public demo configuration.
+
+For Sandbox testing, the Personal buyer account email is `sb-ciade53821110@personal.example.com`. Buyer password: **[PASTE BUYER PASSWORD]**. Do not publish a Business account password, API key, client secret, webhook token, or other secret.
+
+## License
+
+MIT. GitHub recognizes the root `LICENSE` file and its standard MIT text as an MIT license once this file is pushed.
