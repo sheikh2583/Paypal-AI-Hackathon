@@ -1,5 +1,5 @@
 import BetterSqlite3 from "better-sqlite3";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { consumeEmailVerificationToken, ensureAuthTokenSchema, ensureRateLimitIdColumn, hashAuthToken, hashEmailOtp, resetPasswordIdentifier, storeEmailVerificationToken } from "./auth-tokens";
 
 describe("auth token storage", () => {
@@ -9,13 +9,18 @@ describe("auth token storage", () => {
     databases.push(database);
     return database;
   }
-  afterEach(() => { for (const database of databases.splice(0)) database.close(); });
+  afterEach(() => {
+    vi.useRealTimers();
+    for (const database of databases.splice(0)) database.close();
+  });
 
   it("stores only token hashes and consumes verification links once", () => {
     const database = openDatabase();
     ensureAuthTokenSchema(database);
     const token = "a-signed-verification-token";
     const now = new Date("2026-11-03T10:00:00.000Z");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
     storeEmailVerificationToken(database, token, new Date("2026-11-04T10:00:00.000Z"));
     const row = database.prepare("SELECT token_hash FROM auth_email_verification_tokens").get() as { token_hash: string };
     expect(row.token_hash).toBe(hashAuthToken(token));

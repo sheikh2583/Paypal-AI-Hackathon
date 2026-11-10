@@ -51,18 +51,18 @@ We deliberately do **not** build checkout buttons, subscriptions, payouts or dis
 - Verify the signature using PayPal's webhook verification (call PayPal's verify-webhook-signature endpoint with the transmission headers and `PAYPAL_WEBHOOK_ID`) in sandbox mode. In mock mode, accept a fixed local test header.
 - Idempotency: insert `webhook_events` by event id first; if it already exists, return 200 and stop.
 - Respond `200` quickly, then process: look up the local invoice by `paypal_invoice_id`, call `getInvoice` to read the authoritative state, update `paid_cents`/`status`, emit an event, audit it.
-- Relevant event types: invoice paid, invoice cancelled, invoice refunded (check exact names in current docs).
+- Subscribe to the six events in PayPal's [Invoicing webhook catalog](https://developer.paypal.com/platforms/invoicing/reference/invoicing-webhooks/). The listener also accepts `INVOICING.INVOICE.SENT` if delivered. See D57 and [the runbook](runbook.md).
 
 ## Polling fallback (always implement)
 
-A reconciler (`reconcilePayPalInvoices()`) fetches every non-terminal local invoice that has a `paypal_invoice_id` and updates it. Call it: (a) every 10 s from a server-side interval in dev, (b) on dashboard load, (c) from `POST /api/demo/simulate-payment`. This guarantees the demo works even if the tunnel dies.
+A shared reconciler reads PayPal state for linked open invoices and superseded originals. Dashboard and invoice-list reads coalesce within 5 s. A 10 s interval starts on the first such read in dev or the public demo. Mock payment reconciles the affected invoice immediately. The fallback also retries accepted webhook work left pending after an error.
 
 ## Mock mode
 
 `PAYPAL_MODE=mock` swaps in `mock.ts`:
 - Generates fake IDs (`MOCK-INV2-<n>`) and a fake `recipientViewUrl` that points to a local page `/mock-paypal/invoice/[id]` with a "Pay now" button (so the demo can show a pay step with no PayPal dependency).
 - Stores state in the same SQLite DB (`mock_paypal_invoices` table) so it survives reloads.
-- `simulatePayment` flips status to `PAID` and fires the same internal event the webhook would.
+- `simulatePayment` updates the mock provider record. The shared reconciler then updates the local invoice and emits the same events the webhook would.
 - Response shapes must match `__fixtures__`; a contract test compares keys of mock vs fixtures.
 
 ## Known risks

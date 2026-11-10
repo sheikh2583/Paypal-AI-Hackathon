@@ -11,7 +11,6 @@ import {
   type MockPayPalInvoiceRow,
   updateMockPaypalInvoice,
 } from "../db/queries";
-import { emit } from "../events";
 
 // ---------------------------------------------------------------------------
 // ID generation
@@ -62,7 +61,7 @@ export class MockPayPalClient implements PayPalClient {
       paidCents: 0,
       status: "DRAFT",
       recipientViewUrl,
-      createdAt: getNow().toISOString(),
+      createdAt: getNow(this.database).toISOString(),
     };
     insertMockPaypalInvoice(row, this.database);
     return mapMockRowToPayPalInvoice(row);
@@ -97,8 +96,8 @@ export class MockPayPalClient implements PayPalClient {
 
   /**
    * Simulates a client paying the mock invoice.
-   * Flips status to PAID and sets paidCents. Emits `invoice.paid` event.
-   * amountCents defaults to the full invoice amount if not provided.
+   * Reconciliation emits events after the local invoice has been updated.
+   * amountCents defaults to the remaining balance.
    */
   async simulatePayment(paypalInvoiceId: string, amountCents?: Cents): Promise<void> {
     const row = getMockPaypalInvoice(paypalInvoiceId, this.database);
@@ -112,8 +111,8 @@ export class MockPayPalClient implements PayPalClient {
       throw new Error(`Mock invoice ${paypalInvoiceId} is CANCELLED and cannot be paid`);
     }
 
-    const payment = amountCents ?? row.amountCents;
-    const newPaid = row.paidCents + payment;
+    const payment = amountCents ?? row.amountCents - row.paidCents;
+    const newPaid = Math.min(row.amountCents, row.paidCents + payment);
     const newStatus = newPaid >= row.amountCents ? "PAID" : "PARTIALLY_PAID";
 
     updateMockPaypalInvoice(
@@ -121,12 +120,6 @@ export class MockPayPalClient implements PayPalClient {
       { status: newStatus, paidCents: newPaid },
       this.database,
     );
-
-    emit({
-      type: "invoice.paid",
-      invoiceId: paypalInvoiceId, // callers use this to look up local invoice
-      at: getNow().toISOString(),
-    });
   }
 }
 

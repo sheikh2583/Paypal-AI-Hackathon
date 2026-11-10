@@ -6,12 +6,13 @@ import { ScriptedLLM } from '@/lib/llm';
 import { applyClassification } from '@/lib/agent/classify';
 import { runAgent } from '@/lib/agent/run';
 import { scripts } from '@/lib/agent/scripts';
-import { isDemoRequestAuthenticated, unauthorizedResponse } from '@/lib/auth';
+import { guardDemoRoute } from '@/lib/demo';
 
 const inputSchema = z.object({ invoiceId: z.string().min(1) }).strict();
 
 export async function POST(request: Request): Promise<Response> {
-  if (!(await isDemoRequestAuthenticated())) return unauthorizedResponse();
+  const denied = await guardDemoRoute();
+  if (denied) return denied;
   let body: unknown;
   try { body = await request.json(); }
   catch { return Response.json({ error: { code: 'INVALID_JSON', message: 'Request body must be valid JSON.' } }, { status: 400 }); }
@@ -33,7 +34,9 @@ export async function POST(request: Request): Promise<Response> {
   let replyText: string | null = null;
   let turn: number;
 
-  if (latestPlan?.status === 'ACTIVE') {
+  if (latestPlan?.status === 'RESOLVED') {
+    return Response.json({ done: true, message: 'Dana’s plan is fully paid.' });
+  } else if (latestPlan?.status === 'ACTIVE') {
     return Response.json({ done: true, message: 'Dana’s plan is active. Simulate the deposit payment below to finish the walkthrough.' });
   } else if (latestPlan?.status === 'OFFERED') {
     replyText = script.clientReplies[1] ?? null;

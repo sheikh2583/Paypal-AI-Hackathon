@@ -60,7 +60,7 @@ SQLite via Drizzle. All money columns are integer cents. All timestamps are ISO-
 |---|---|---|
 | id | text pk | |
 | invoice_id | text fk | the original invoice |
-| status | text | `OFFERED` \| `ACCEPTED` \| `ACTIVE` \| `REJECTED` \| `EXPIRED` \| `PENDING_APPROVAL` |
+| status | text | `OFFERED` \| `ACCEPTED` \| `ACTIVE` \| `RESOLVED` \| `REJECTED` \| `EXPIRED` \| `PENDING_APPROVAL` |
 | discount_percent | integer | default 0 |
 | total_cents | integer | after discount |
 | installments_json | text | array of `{no, amountCents, dueAt}` |
@@ -103,7 +103,7 @@ SQLite via Drizzle. All money columns are integer cents. All timestamps are ISO-
 | ok | integer | 1/0 |
 
 ### `webhook_events`
-`id` (PayPal event id, pk), `type`, `received_at`, `processed_at`, `payload_json` (redacted). Used for idempotency.
+`id` (PayPal event ID, primary key), `event_type`, `received_at`, `processed_at`, and `payload_json`. The handler stores only the provider invoice ID in the payload. A null `processed_at` indicates pending work.
 
 ## Indexes
 

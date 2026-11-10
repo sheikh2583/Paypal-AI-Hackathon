@@ -7,7 +7,7 @@ import { db, type AppDb } from "../db/client";
 import { getInvoice } from "../db/queries";
 import { getPayPalEnv } from "../env";
 import { MockPayPalClient } from "./mock";
-import { reconcilePayPalInvoices } from "./reconcile";
+import { reconcilePayPalInvoice } from "./reconcile";
 
 export interface SimulatePaymentResult {
   paypalInvoiceId: string;
@@ -34,7 +34,7 @@ export async function simulateMockPayment(
 
   const mock = new MockPayPalClient(database);
   await mock.simulatePayment(paypalInvoiceId, amountCents);
-  await reconcilePayPalInvoices(database);
+  await reconcilePayPalInvoice(paypalInvoiceId, database, mock);
 
   const updated = await mock.getInvoice(paypalInvoiceId);
   return { paypalInvoiceId, status: updated.status };

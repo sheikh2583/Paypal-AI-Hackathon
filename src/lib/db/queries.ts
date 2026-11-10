@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
 import type {
   ApprovalKind,
   ApprovalRow,
@@ -140,6 +140,11 @@ export function listInvoices(database: AppDb = db): InvoiceWithClient[] {
 
 export function getInvoice(id: string, database: AppDb = db): InvoiceRow | undefined {
   const row = database.select().from(invoices).where(eq(invoices.id, id)).limit(1).all()[0];
+  return row ? mapInvoice(row) : undefined;
+}
+
+export function getInvoiceByPayPalId(paypalInvoiceId: string, database: AppDb = db): InvoiceRow | undefined {
+  const row = database.select().from(invoices).where(eq(invoices.paypalInvoiceId, paypalInvoiceId)).limit(1).all()[0];
   return row ? mapInvoice(row) : undefined;
 }
 
@@ -353,6 +358,21 @@ export function upsertWebhookEvent(event: WebhookEventInput, database: AppDb = d
   return inserted.length > 0;
 }
 
+export function markWebhookEventProcessed(id: string, database: AppDb = db): void {
+  database.update(webhookEvents).set({ processedAt: new Date().toISOString() })
+    .where(eq(webhookEvents.id, id)).run();
+}
+
+export function isWebhookEventPending(id: string, database: AppDb = db): boolean {
+  return database.select({ id: webhookEvents.id }).from(webhookEvents)
+    .where(and(eq(webhookEvents.id, id), isNull(webhookEvents.processedAt))).get() !== undefined;
+}
+
+export function listPendingWebhookEvents(database: AppDb = db) {
+  return database.select().from(webhookEvents).where(isNull(webhookEvents.processedAt))
+    .orderBy(webhookEvents.receivedAt).limit(25).all();
+}
+
 export function getKv(key: string, database: AppDb = db): string | undefined {
   return database.select({ value: kv.value }).from(kv).where(eq(kv.key, key)).limit(1).all()[0]?.value;
 }
@@ -445,9 +465,9 @@ export function updateMockPaypalInvoice(
   return row ? mapMockInvoice(row) : undefined;
 }
 
-/** Returns all local invoices that have a paypal_invoice_id and are not in a terminal state. */
+/** Include superseded originals so the fallback also catches unexpected payments (D6). */
 export function listReconcilableInvoices(database: AppDb = db): InvoiceRow[] {
-  const terminalStatuses: InvoiceStatus[] = ["PAID", "CANCELLED", "SUPERSEDED"];
+  const terminalStatuses: InvoiceStatus[] = ["PAID", "CANCELLED"];
   return database
     .select()
     .from(invoices)

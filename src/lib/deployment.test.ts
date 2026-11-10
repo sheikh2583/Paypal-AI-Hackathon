@@ -32,9 +32,10 @@ describe("production deployment commands", () => {
     expect(seedIfEmptyIdx).toBeLessThan(startIdx);
   });
 
-  it("startCommand is non-interactive: db:push uses --accept-data-loss", () => {
+  it("does not pass unsupported or destructive options to Drizzle on startup", () => {
     const startCommand = renderConfig.match(/^\s+startCommand:\s*(.+)$/m)?.[1] ?? "";
-    expect(startCommand).toMatch(/db:push.*--accept-data-loss/);
+    expect(startCommand).toMatch(/db:push &&/);
+    expect(startCommand).not.toMatch(/--accept-data-loss|--force/);
   });
 
   it("DEMO_PUBLIC is set to 1 in render.yaml (D56)", () => {

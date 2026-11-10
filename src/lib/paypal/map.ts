@@ -60,6 +60,7 @@ export interface PayPalGetInvoiceResponse {
   payments?: {
     paid_amount?: PayPalAmountObject;
   };
+  refunds?: { refund_amount?: PayPalAmountObject };
 }
 
 // ---------------------------------------------------------------------------
@@ -84,9 +85,11 @@ export function extractAmountCents(response: PayPalGetInvoiceResponse): Cents {
  * Returns 0 when no payment exists yet.
  */
 export function extractPaidCents(response: PayPalGetInvoiceResponse): Cents {
-  const raw = response.payments?.paid_amount?.value;
-  if (!raw) return 0;
-  return decimalStringToCents(raw);
+  const status = response.status.toUpperCase();
+  if (status === "REFUNDED" || status === "MARKED_AS_REFUNDED") return 0;
+  const paid = response.payments?.paid_amount?.value;
+  const refunded = response.refunds?.refund_amount?.value;
+  return Math.max(0, (paid ? decimalStringToCents(paid) : 0) - (refunded ? decimalStringToCents(refunded) : 0));
 }
 
 /**
@@ -102,7 +105,7 @@ export function mapPayPalStatus(
   if (s === "DRAFT") return "DRAFT";
   if (s === "SENT" || s === "UNPAID" || s === "SCHEDULED") return "SENT";
   if (s === "PAID" || s === "MARKED_AS_PAID") return "PAID";
-  if (s === "PARTIALLY_PAID") return "PARTIALLY_PAID";
+  if (s === "PARTIALLY_PAID" || s === "PARTIALLY_REFUNDED") return "PARTIALLY_PAID";
   if (s === "CANCELLED" || s === "REFUNDED" || s === "MARKED_AS_REFUNDED") return "CANCELLED";
   return "UNKNOWN";
 }

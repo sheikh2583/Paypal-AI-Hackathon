@@ -93,7 +93,7 @@ export const plans = sqliteTable(
     id: text("id").primaryKey(),
     invoiceId: text("invoice_id").notNull().references(() => invoices.id),
     status: text("status", {
-      enum: ["OFFERED", "ACCEPTED", "ACTIVE", "REJECTED", "EXPIRED", "PENDING_APPROVAL"],
+      enum: ["OFFERED", "ACCEPTED", "ACTIVE", "RESOLVED", "REJECTED", "EXPIRED", "PENDING_APPROVAL"],
     }).$type<PlanStatus>().notNull(),
     discountPercent: integer("discount_percent").notNull(),
     totalCents: integer("total_cents").notNull(),

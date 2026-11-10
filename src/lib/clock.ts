@@ -46,8 +46,8 @@ export function advanceClockDays(days: number, database?: AppDb): void {
 }
 
 /** DEMO_NOW if set, otherwise real time, plus the demo offset. */
-export function getNow(): Date {
+export function getNow(database?: AppDb): Date {
   const { demoNow } = getAppEnv();
   const base = demoNow ? new Date(demoNow) : new Date();
-  return new Date(base.getTime() + getClockOffsetMs());
+  return new Date(base.getTime() + getClockOffsetMs(database));
 }

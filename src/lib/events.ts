@@ -7,7 +7,8 @@ export interface AppEvent {
 }
 
 type EventListener = (event: AppEvent) => void;
-const listeners = new Set<EventListener>();
+const processScope = globalThis as typeof globalThis & { chaserEventListeners?: Set<EventListener> };
+const listeners = processScope.chaserEventListeners ??= new Set<EventListener>();
 
 export function emit(event: AppEvent): void {
   for (const listener of [...listeners]) listener(event);

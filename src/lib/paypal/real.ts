@@ -37,10 +37,11 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function paypalFetch(
+export async function paypalFetch(
   url: string,
   init: RequestInit & { requestId?: string },
   env: ReturnType<typeof getPayPalEnv>,
+  retries = MAX_RETRIES,
 ): Promise<Response> {
   const token = await getAccessToken(env);
   const headers: Record<string, string> = {
@@ -52,7 +53,7 @@ async function paypalFetch(
   };
 
   let lastError: Error | undefined;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) {
       await sleep(RETRY_DELAY_MS * attempt);
     }
@@ -64,7 +65,7 @@ async function paypalFetch(
       });
 
       // Retry only on 5xx or network errors (never 4xx — those are our mistakes).
-      if (response.status >= 500 && attempt < MAX_RETRIES) {
+      if (response.status >= 500 && attempt < retries) {
         lastError = new PayPalError(response.status, `Server error on attempt ${attempt + 1}`);
         continue;
       }
@@ -72,7 +73,7 @@ async function paypalFetch(
     } catch (err) {
       // Network / timeout errors are retryable.
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < MAX_RETRIES) continue;
+      if (attempt < retries) continue;
     }
   }
   throw lastError ?? new Error("PayPal fetch failed after retries");

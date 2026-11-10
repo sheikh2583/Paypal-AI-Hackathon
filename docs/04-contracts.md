@@ -68,7 +68,7 @@ Row types mirror `docs/03-data-model.md` in camelCase. All money is `Cents`; all
 
 ```ts
 export type PlanStatus =
-  | 'OFFERED' | 'ACCEPTED' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'PENDING_APPROVAL';
+  | 'OFFERED' | 'ACCEPTED' | 'ACTIVE' | 'RESOLVED' | 'REJECTED' | 'EXPIRED' | 'PENDING_APPROVAL';
 
 export type ApprovalKind =
   | 'PLAN_OUT_OF_BOUNDS' | 'PLAN_NEEDS_SIGNOFF' | 'DISCOUNT_REQUEST' | 'DISPUTE'
@@ -214,7 +214,7 @@ All owner pages, mock invoice pages, and mutation APIs require a verified single
 | method + path | body | returns |
 |---|---|---|
 | `GET/POST /api/auth/[...all]` | Better Auth payloads | Email/password sign-up and sign-in, email verification, OTP challenge, password reset, session and sign-out endpoints; setup gate permits only the first configured owner |
-| `GET /api/invoices` | – | `InvoiceListItem[]` (with client, risk, chaseState, nextAction) |
+| `GET /api/invoices` | – | `InvoiceListItem[]` with a 5-second reconciliation throttle. Client email is redacted in public demo mode. |
 | `GET /api/invoices/:id` | – | invoice + messages + plan + approvals |
 | `POST /api/agent/run` | `{invoiceId}` | `AgentRunResult` |
 | `POST /api/agent/run-due` | – | runs the agent for every invoice whose `next_followup_at <= now`; returns `AgentRunResult[]` |
@@ -224,8 +224,13 @@ All owner pages, mock invoice pages, and mutation APIs require a verified single
 | `POST /api/approvals/:id` | `{decision:'APPROVED'\|'REJECTED'\|'EDITED', note?, plan?}` | updated approval |
 | `GET/PUT /api/policy` | `OwnerPolicy` | `OwnerPolicy` |
 | `GET /api/audit?invoiceId=` | – | `AuditEntry[]` newest first |
-| `POST /api/webhooks/paypal` | PayPal event | `200` fast; idempotent |
+| `POST /api/webhooks/paypal` | PayPal event, signed in Sandbox or `X-Chaser-Mock-Webhook: 1` in mock | `200 {received: true}` after recording the event ID. Invalid signatures return `400`, verification outages return `503`, and unsupported methods such as GET return `405`. No owner session required. |
+| `GET /api/events` | – | `text/event-stream` with JSON `data:` frames of `{type, invoiceId?, at}`, a comment heartbeat every 15 s, and browser reconnect. Requires workspace access. |
 | `POST /api/demo/step` | `{invoiceId}` | advance one persisted scripted Dana step |
-| `POST /api/demo/reset` | `{}` | mock mode only: reseeds fictional demo data |
+| `POST /api/demo/reset` | `{}` | mock mode only, reseeds fictional demo data and resets the demo clock |
+| `POST /api/demo/simulate-payment` | `{invoiceId, amountCents?}` | Local invoice ID. Mock applies the payment and reconciles. Sandbox reconciles and returns `409` with instructions to pay on PayPal. |
+| `POST /api/demo/advance-time` | `{days}` | Adds 1–365 whole days to the demo clock, recomputes overdue status, and refreshes risk on open invoices. Returns `{now, overdueUpdated, refreshed, message}`. |
+
+Demo routes return `404` in production unless `DEMO_PUBLIC=1`. Enabled routes retain the workspace access gate. In an active plan, paid installment count comes from the invoice rows. When all installments are paid, the plan and the original invoice's chase state become `RESOLVED`. The original payment status stays `SUPERSEDED` so installment amounts are counted once.
 
 Error shape for all routes: `{ error: { code: string, message: string } }` with an appropriate HTTP status.

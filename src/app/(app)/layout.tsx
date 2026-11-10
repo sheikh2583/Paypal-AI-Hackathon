@@ -1,4 +1,5 @@
 import { AppNav } from "@/components/app-nav";
+import { LiveUpdates } from "@/components/live-updates";
 import { getDemoSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -6,6 +7,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!(await getDemoSession())) redirect("/login");
   return (
     <div className="min-h-screen md:flex">
+      <LiveUpdates />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:text-primary-foreground"

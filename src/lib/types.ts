@@ -68,7 +68,7 @@ export interface ChatMessage {
 // ---------------------------------------------------------------------------
 
 export type PlanStatus =
-  | 'OFFERED' | 'ACCEPTED' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'PENDING_APPROVAL';
+  | 'OFFERED' | 'ACCEPTED' | 'ACTIVE' | 'RESOLVED' | 'REJECTED' | 'EXPIRED' | 'PENDING_APPROVAL';
 
 export type ApprovalKind =
   | 'PLAN_OUT_OF_BOUNDS' | 'PLAN_NEEDS_SIGNOFF' | 'DISCOUNT_REQUEST' | 'DISPUTE'

@@ -1,137 +1,140 @@
-// reconcilePayPalInvoices: for every non-terminal local invoice with a
-// paypal_invoice_id, fetch the current PayPal status, update local state,
-// emit events, and write audit entries. Idempotent (D37).
-import type { InvoiceStatus } from "../types";
 import { db, type AppDb } from "../db/client";
 import {
-  insertApproval,
-  listApprovals,
-  listReconcilableInvoices,
-  updateInvoice,
+  getInvoiceByPayPalId, getPlan, insertApproval, listApprovals, listInvoicesByPlanId,
+  listReconcilableInvoices, updateInvoice, updatePlan,
 } from "../db/queries";
 import { audit } from "../audit";
-import { emit } from "../events";
+import { emit, type AppEvent } from "../events";
 import { getNow } from "../clock";
 import { getPayPal } from "./index";
 import { refreshRisk } from "../risk/service";
+import type { InvoiceRow, PayPalClient, PayPalInvoice } from "../types";
 
-function mapPayPalStatusToLocal(paypalStatus: PayPalInvoice["status"]): InvoiceStatus | null {
-  switch (paypalStatus) {
-    case "PAID": return "PAID";
-    case "PARTIALLY_PAID": return "PARTIALLY_PAID";
-    case "CANCELLED": return "CANCELLED";
-    // SENT, DRAFT, UNKNOWN — no local status change; we don't downgrade
-    default: return null;
+function updatePlanProgress(invoice: InvoiceRow, database: AppDb, at: string): AppEvent | undefined {
+  if (!invoice.planId || !invoice.parentInvoiceId) return;
+  const plan = getPlan(invoice.planId, database);
+  if (!plan || plan.invoiceId !== invoice.parentInvoiceId || !["ACTIVE", "RESOLVED"].includes(plan.status)) return;
+
+  const installments = listInvoicesByPlanId(plan.id, database).filter((row) => row.parentInvoiceId === plan.invoiceId);
+  const paid = plan.installments.filter(({ no }) =>
+    installments.some((row) => row.installmentNo === no && row.status === "PAID"),
+  ).length;
+  const complete = paid > 0 && paid === plan.installments.length;
+  const status = complete ? "RESOLVED" : "ACTIVE";
+  if (plan.status !== status) {
+    updatePlan(plan.id, { status }, database);
+    updateInvoice(plan.invoiceId, {
+      chaseState: complete ? "RESOLVED" : "PLAN_ACTIVE",
+      nextFollowupAt: null,
+    }, database);
+  }
+  audit({
+    actor: "paypal", action: "reconcile.plan.progress", invoiceId: plan.invoiceId,
+    input: { planId: plan.id, installmentId: invoice.id },
+    result: { status, paidInstallments: paid, totalInstallments: plan.installments.length }, ok: true,
+  }, database, at);
+  return { type: "invoice.updated", invoiceId: plan.invoiceId, at };
+}
+
+function applySnapshot(paypalInvoiceId: string, remote: PayPalInvoice, database: AppDb, at: string): AppEvent[] {
+  const invoice = getInvoiceByPayPalId(paypalInvoiceId, database);
+  if (!invoice) return [];
+
+  if (invoice.status === "SUPERSEDED") {
+    if (remote.paidCents <= 0 || listApprovals("PENDING", database).some(
+      (entry) => entry.invoiceId === invoice.id && entry.kind === "UNEXPECTED_PAYMENT",
+    )) return [];
+
+    insertApproval({
+      invoiceId: invoice.id, planId: invoice.planId, kind: "UNEXPECTED_PAYMENT",
+      reason: `Payment of ${remote.paidCents} cents received on a superseded invoice.`,
+      recommendation: "Review and decide whether to credit toward the plan or refund.",
+      status: "PENDING", ownerResponse: null, createdAt: at, resolvedAt: null,
+    }, database);
+    audit({
+      actor: "paypal", action: "reconcile.unexpected_payment", invoiceId: invoice.id,
+      input: { paypalInvoiceId, paidCents: remote.paidCents },
+      result: { approval: "UNEXPECTED_PAYMENT" }, ok: true,
+    }, database, at);
+    return [{ type: "approval.created", invoiceId: invoice.id, at }];
+  }
+
+  const status = remote.status;
+  if (status !== "PAID" && status !== "PARTIALLY_PAID" && status !== "CANCELLED") return [];
+  if (status === invoice.status && remote.paidCents === invoice.paidCents) return [];
+
+  updateInvoice(invoice.id, {
+    status, paidCents: remote.paidCents,
+    ...(status === "PAID" ? { chaseState: "RESOLVED" as const } : {}),
+    ...(status !== "PARTIALLY_PAID" ? { nextFollowupAt: null } : {}),
+  }, database);
+  audit({
+    actor: "paypal", action: `reconcile.invoice.${status.toLowerCase()}`, invoiceId: invoice.id,
+    input: { paypalInvoiceId, previousStatus: invoice.status, previousPaidCents: invoice.paidCents },
+    result: { status, paidCents: remote.paidCents }, ok: true,
+  }, database, at);
+
+  const events: AppEvent[] = [{ type: "invoice.updated", invoiceId: invoice.id, at }];
+  if (status !== "CANCELLED" && (remote.paidCents > invoice.paidCents || status === "PAID" && invoice.status !== "PAID")) {
+    events.push({ type: "invoice.paid", invoiceId: invoice.id, at });
+  }
+  const planEvent = updatePlanProgress(invoice, database, at);
+  if (planEvent) events.push(planEvent);
+  return events;
+}
+
+// Serialize fetch-and-apply per invoice so an older poll cannot undo a newer webhook snapshot.
+const invoiceQueues = new WeakMap<AppDb, Map<string, Promise<unknown>>>();
+
+export async function reconcilePayPalInvoice(
+  paypalInvoiceId: string,
+  database: AppDb = db,
+  paypal: PayPalClient = getPayPal(undefined, database),
+): Promise<"unknown" | "updated" | "unchanged"> {
+  let queue = invoiceQueues.get(database);
+  if (!queue) {
+    queue = new Map();
+    invoiceQueues.set(database, queue);
+  }
+  const previous = queue.get(paypalInvoiceId);
+  const work = (async () => {
+    await previous?.catch(() => undefined);
+    const invoice = getInvoiceByPayPalId(paypalInvoiceId, database);
+    if (!invoice) return "unknown" as const;
+    const remote = await paypal.getInvoice(paypalInvoiceId);
+    if (remote.paypalInvoiceId !== paypalInvoiceId || !Number.isSafeInteger(remote.paidCents) || remote.paidCents < 0) {
+      throw new Error("INVALID_PAYPAL_INVOICE");
+    }
+    const now = getNow(database);
+    const events = database.$client.transaction(() => applySnapshot(paypalInvoiceId, remote, database, now.toISOString()))();
+    if (events.some((event) => event.type === "invoice.updated" && event.invoiceId === invoice.id)) {
+      try {
+        await refreshRisk(invoice.id, database, now);
+      } catch {
+        audit({ actor: "paypal", action: "reconcile.risk.error", invoiceId: invoice.id, ok: false }, database, now.toISOString());
+      }
+    }
+    for (const event of events) emit(event);
+    return events.length > 0 ? "updated" as const : "unchanged" as const;
+  })();
+  queue.set(paypalInvoiceId, work);
+  try {
+    return await work;
+  } finally {
+    if (queue.get(paypalInvoiceId) === work) queue.delete(paypalInvoiceId);
   }
 }
 
-import type { PayPalInvoice } from "../types";
-
-export async function reconcilePayPalInvoices(database: AppDb = db): Promise<void> {
-  const paypal = getPayPal();
-  const invoices = listReconcilableInvoices(database);
-  const now = getNow().toISOString();
-
-  for (const invoice of invoices) {
+export async function reconcilePayPalInvoices(database: AppDb = db, paypal = getPayPal(undefined, database)): Promise<void> {
+  for (const invoice of listReconcilableInvoices(database)) {
     if (!invoice.paypalInvoiceId) continue;
-
-    let paypalInvoice: PayPalInvoice;
     try {
-      paypalInvoice = await paypal.getInvoice(invoice.paypalInvoiceId);
-    } catch (err) {
-      // Don't let one bad invoice break the whole run.
-      audit(
-        {
-          actor: "paypal",
-          action: "reconcile.get_invoice.error",
-          invoiceId: invoice.id,
-          input: { paypalInvoiceId: invoice.paypalInvoiceId },
-          result: { error: err instanceof Error ? err.message : String(err) },
-          ok: false,
-        },
-        database,
-        now,
-      );
-      continue;
-    }
-
-    const newStatus = mapPayPalStatusToLocal(paypalInvoice.status);
-
-    // Handle SUPERSEDED invoice that received a payment (D6).
-    if (invoice.status === "SUPERSEDED" && paypalInvoice.paidCents > 0) {
-      // Check for an existing UNEXPECTED_PAYMENT approval to avoid duplicates (D37).
-      const existingApprovals = listApprovals(undefined, database).filter(
-        (a) => a.invoiceId === invoice.id && a.kind === "UNEXPECTED_PAYMENT" && a.status === "PENDING",
-      );
-      if (existingApprovals.length === 0) {
-        insertApproval(
-          {
-            invoiceId: invoice.id,
-            planId: invoice.planId,
-            kind: "UNEXPECTED_PAYMENT",
-            reason: `Payment of ${paypalInvoice.paidCents} cents received on SUPERSEDED invoice ${invoice.paypalInvoiceId}. Manual refund or credit may be required.`,
-            recommendation: "Review and decide whether to credit toward the plan or refund.",
-            status: "PENDING",
-            ownerResponse: null,
-            createdAt: now,
-            resolvedAt: null,
-          },
-          database,
-        );
-        audit(
-          {
-            actor: "paypal",
-            action: "reconcile.unexpected_payment",
-            invoiceId: invoice.id,
-            input: { paypalInvoiceId: invoice.paypalInvoiceId, paidCents: paypalInvoice.paidCents },
-            result: { approval: "UNEXPECTED_PAYMENT" },
-            ok: true,
-          },
-          database,
-          now,
-        );
-        emit({ type: "approval.created", invoiceId: invoice.id, at: now });
-      }
-      continue;
-    }
-
-    // Skip if no actionable status change (idempotency: D37).
-    if (!newStatus || newStatus === invoice.status) continue;
-
-    // Also skip if paid amount hasn't changed (avoid duplicate events).
-    const paidChanged = paypalInvoice.paidCents !== invoice.paidCents;
-    if (!paidChanged && newStatus === invoice.status) continue;
-
-    updateInvoice(
-      invoice.id,
-      { status: newStatus, paidCents: paypalInvoice.paidCents },
-      database,
-    );
-    if (newStatus === "PAID" || newStatus === "PARTIALLY_PAID") {
-      await refreshRisk(invoice.id, database, new Date(now));
-    }
-
-    audit(
-      {
-        actor: "paypal",
-        action: `reconcile.invoice.${newStatus.toLowerCase()}`,
-        invoiceId: invoice.id,
-        input: {
-          paypalInvoiceId: invoice.paypalInvoiceId,
-          previousStatus: invoice.status,
-          paidCents: paypalInvoice.paidCents,
-        },
-        result: { newStatus },
-        ok: true,
-      },
-      database,
-      now,
-    );
-
-    emit({ type: "invoice.updated", invoiceId: invoice.id, at: now });
-
-    if (newStatus === "PAID" || newStatus === "PARTIALLY_PAID") {
-      emit({ type: "invoice.paid", invoiceId: invoice.id, at: now });
+      await reconcilePayPalInvoice(invoice.paypalInvoiceId, database, paypal);
+    } catch {
+      audit({
+        actor: "paypal", action: "reconcile.get_invoice.error", invoiceId: invoice.id,
+        input: { paypalInvoiceId: invoice.paypalInvoiceId }, ok: false,
+      }, database, getNow(database).toISOString());
     }
   }
 }

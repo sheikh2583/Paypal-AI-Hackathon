@@ -7,7 +7,7 @@ ephemeral filesystem, including the SQLite file. This is intentional for the hac
 
 - **`DEMO_PUBLIC=1`** removes the login requirement entirely — judges browse without creating
   an account or receiving email.
-- The startup sequence recreates the database from scratch on every cold boot in ~5–10 s.
+- The startup sequence recreates the database from scratch on every cold boot.
 - No data entered by a judge persists across restarts (demo-safe; no real user data).
 
 ## Startup Sequence (render.yaml)
@@ -18,12 +18,12 @@ db:push → auth:migrate → db:seed-if-empty → next start
 
 | Step | Command | What it does |
 |---|---|---|
-| 1 | `pnpm db:push --accept-data-loss` | Creates/updates the business schema (idempotent) |
+| 1 | `pnpm db:push` | Creates the business schema on a fresh demo database |
 | 2 | `pnpm auth:migrate` | Runs Better Auth migrations; repairs rateLimit schema |
 | 3 | `pnpm db:seed-if-empty` | Seeds demo data **only** when the invoices table is empty |
 | 4 | `pnpm start` | Serves the Next.js app |
 
-All steps are non-interactive and safe to repeat.
+These steps are safe to repeat on the unchanged demo schema. Review destructive schema changes separately.
 
 ## Environment Variables
 
