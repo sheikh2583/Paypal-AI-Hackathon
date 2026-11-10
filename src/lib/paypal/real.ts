@@ -1,6 +1,5 @@
-// UNVERIFIED: Built from current PayPal developer docs (Nov 2026, D32/D35).
-// Must be tested against live Sandbox credentials before the hackathon demo.
 // PayPal Sandbox only — the env guard in getPayPalEnv() prevents live URLs.
+import { z } from "zod";
 import type { Cents, CreateInvoiceInput, PayPalClient, PayPalInvoice } from "../types";
 import { getPayPalEnv } from "../env";
 import { getAccessToken } from "./auth";
@@ -32,6 +31,10 @@ export class PayPalError extends Error {
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
+const CREATE_INVOICE_RESPONSE = z.object({
+  id: z.string().optional(),
+  href: z.url().optional(),
+});
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,13 +114,14 @@ export class RealPayPalClient implements PayPalClient {
       throw new PayPalError(response.status, `Create invoice returned HTTP ${response.status}`);
     }
 
-    const data = (await response.json()) as PayPalGetInvoiceResponse;
-    const invoiceId = data.id;
-    if (!invoiceId) {
-      throw new PayPalError(201, "Create invoice response missing id");
+    const { data } = CREATE_INVOICE_RESPONSE.safeParse(await response.json());
+    const invoicePath = data?.href ? new URL(data.href).pathname : "";
+    const invoiceId = data?.id ?? /^\/v2\/invoicing\/invoices\/([^/]+)$/.exec(invoicePath)?.[1];
+    if (!invoiceId || !/^INV2-[A-Z0-9-]+$/.test(invoiceId)) {
+      throw new PayPalError(201, "Create invoice response missing a valid invoice id");
     }
 
-    // Fetch full record to get recipient_view_url (may not be in create response).
+    // Resolve the ID on our configured Sandbox host instead of following the link.
     return this.getInvoice(invoiceId);
   }
 

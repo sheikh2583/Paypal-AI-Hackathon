@@ -20,7 +20,7 @@ export interface PayPalCreateInvoiceBody {
     invoice_date: string; // YYYY-MM-DD
     currency_code: string;
     note?: string;
-    payment_term: { term_type: "DUE_ON_DATE"; due_date: string };
+    payment_term: { term_type: "DUE_ON_DATE_SPECIFIED"; due_date: string };
   };
   invoicer: {
     email_address: string;
@@ -129,7 +129,7 @@ export function mapGetResponseToInvoice(
 /**
  * Maps our CreateInvoiceInput to the PayPal Invoicing v2 request body.
  * Amount is a single line-item at quantity 1.
- * Uses DUE_ON_DATE payment term with the invoice's dueAt date.
+ * Uses DUE_ON_DATE_SPECIFIED with the invoice's dueAt date.
  * `merchantEmail` is required by PayPal — callers must supply it from env.
  */
 export function buildCreateInvoiceBody(
@@ -148,7 +148,7 @@ export function buildCreateInvoiceBody(
       currency_code: "USD",
       ...(input.note ? { note: input.note } : {}),
       payment_term: {
-        term_type: "DUE_ON_DATE",
+        term_type: "DUE_ON_DATE_SPECIFIED",
         due_date: input.dueAt.slice(0, 10), // ISO date portion only
       },
     },

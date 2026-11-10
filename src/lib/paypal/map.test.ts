@@ -149,7 +149,7 @@ describe("buildCreateInvoiceBody", () => {
     expect(body.detail.invoice_number).toBe("CH-2026-101");
     expect(body.detail.currency_code).toBe("USD");
     expect(body.detail.note).toBe("Thank you");
-    expect(body.detail.payment_term.term_type).toBe("DUE_ON_DATE");
+    expect(body.detail.payment_term.term_type).toBe("DUE_ON_DATE_SPECIFIED");
     expect(body.detail.payment_term.due_date).toBe("2026-12-01");
     expect(body.invoicer.email_address).toBe("merchant@sandbox.paypal.com");
     expect(body.primary_recipients[0]?.billing_info.email_address).toBe("elena@example.com");

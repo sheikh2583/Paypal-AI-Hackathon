@@ -32,9 +32,10 @@ We deliberately do **not** build checkout buttons, subscriptions, payouts or dis
 ## Invoicing flow we implement
 
 1. **createInvoice** → `POST {BASE}/v2/invoicing/invoices` with a body containing `detail` (invoice number, currency `USD`, due date/payment term, note), `invoicer` (business name/email), `primary_recipients` (client name/email) and `items` (one line item: description, quantity 1, unit amount as a decimal string). Send a `PayPal-Request-Id` header (our `requestId`) for idempotency.
+   - Use `DUE_ON_DATE_SPECIFIED` with `detail.payment_term.due_date`. Sandbox returned HTTP 201 with an invoice link in `href`. Extract the `INV2-` ID and fetch the draft from the configured Sandbox API.
    - Invoice numbers must be unique per account; if the API offers a "generate next invoice number" endpoint, use it, otherwise generate `CHSR-<yyyymmdd>-<seq>`.
 2. **sendInvoice** → `POST {BASE}/v2/invoicing/invoices/{id}/send`. This emails the recipient (Sandbox buyer) and makes the hosted invoice page available.
-3. **getInvoice** → `GET {BASE}/v2/invoicing/invoices/{id}`; map `status` (e.g. `DRAFT`, `SENT`, `PAID`, `PARTIALLY_PAID`, `CANCELLED`) and payment amounts into our `PayPalInvoice`.
+3. **getInvoice** → `GET {BASE}/v2/invoicing/invoices/{id}`. Map status and payment amounts into `PayPalInvoice`. An immediate read after send can return `SCHEDULED`, which maps to Chaser's `SENT` status. Read the payment link from `detail.metadata.recipient_view_url`.
 4. **cancelInvoice** → `POST {BASE}/v2/invoicing/invoices/{id}/cancel` (used if a plan is rejected after invoices were created, or in demo reset).
 
 **Installment plans** are modeled as **N separate invoices** (deposit + installments), each with its own due date, linked to the original via `parent_invoice_id`/`plan_id`. The original invoice becomes `SUPERSEDED` (cancelled in PayPal if still unpaid, with a note referencing the plan). Rationale: simple status tracking, per-installment payment links, and a clear demo.
