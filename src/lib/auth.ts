@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { twoFactor } from "better-auth/plugins";
+import { SqliteDialect } from "kysely";
 import { headers } from "next/headers";
 import { db } from "@/lib/db/client";
 import { getAppEnv, getAuthEnv } from "@/lib/env";
@@ -17,7 +18,13 @@ export const auth = betterAuth({
   appName: "Chaser",
   baseURL: settings.baseUrl,
   secret: authSecret,
-  database: db.$client,
+  // Explicit dialect selection keeps libSQL's internal "db" property from
+  // being mistaken for a preconfigured Kysely adapter.
+  database: {
+    dialect: new SqliteDialect({ database: async () => db.$client }),
+    type: "sqlite",
+    transaction: true,
+  },
   trustedOrigins: [settings.baseUrl],
   emailAndPassword: {
     enabled: true,
@@ -129,7 +136,7 @@ export function ensureAuthSchema(): Promise<void> {
     
     if (rateLimitExists) {
       ensureRateLimitIdColumn(
-        db.$client.pragma('table_info("rateLimit")') as Array<{ name: string }>,
+        db.$client.prepare('PRAGMA table_info("rateLimit")').all() as Array<{ name: string }>,
         () => db.$client.exec('ALTER TABLE "rateLimit" ADD COLUMN "id" TEXT'),
       );
     }

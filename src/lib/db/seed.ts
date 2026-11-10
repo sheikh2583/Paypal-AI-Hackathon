@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { getPayPalEnv } from "../env";
+import { getDatabaseEnv, getPayPalEnv } from "../env";
 import { getNow } from "../clock";
 import type { AppDb } from "./client";
 import { db } from "./client";
@@ -162,6 +162,28 @@ export async function seedDatabase(
   options: SeedOptions = {},
   suppliedNow?: Date,
 ): Promise<SeededInvoiceSummary[]> {
+  if (database === db && getDatabaseEnv().mode === "turso") {
+    throw new Error("Full demo reset is unavailable on the hosted Turso database.");
+  }
+  const seed = database.$client.transaction(() => {
+    database.$client.exec(`
+      DELETE FROM messages;
+      DELETE FROM approvals;
+      DELETE FROM audit_log;
+      DELETE FROM webhook_events;
+      DELETE FROM mock_paypal_invoices;
+      DELETE FROM plans;
+      DELETE FROM invoices;
+      DELETE FROM clients;
+      DELETE FROM owner_policy;
+      DELETE FROM kv;
+    `);
+    return insertSeedRows(database, options, suppliedNow);
+  })();
+  return refreshSeededInvoices(database, seed);
+}
+
+function insertSeedRows(database: AppDb, options: SeedOptions, suppliedNow?: Date) {
   const paypalEnv =
     options.paypalMode === undefined ||
     (options.paypalMode === "sandbox" && options.sandboxBuyerEmail === undefined)
@@ -173,21 +195,7 @@ export async function seedDatabase(
     throw new Error("PAYPAL_SANDBOX_BUYER_EMAIL is required when seeding in sandbox mode");
   }
 
-  // Idempotent: truncate all mutable tables in FK-safe order
-  database.$client.exec(`
-    DELETE FROM messages;
-    DELETE FROM approvals;
-    DELETE FROM audit_log;
-    DELETE FROM webhook_events;
-    DELETE FROM mock_paypal_invoices;
-    DELETE FROM plans;
-    DELETE FROM invoices;
-    DELETE FROM clients;
-    DELETE FROM owner_policy;
-    DELETE FROM kv;
-  `);
-
-  const now = suppliedNow ?? getNow();
+  const now = suppliedNow ?? getNow(database);
   const seedAt = now.toISOString();
 
   // Sandbox mode: every client gets the sandbox buyer email so invoices reach
@@ -325,6 +333,13 @@ export async function seedDatabase(
 
   database.insert(kv).values({ key: "clock_offset_days", value: "0" }).run();
 
+  return { allInvoices, now };
+}
+
+async function refreshSeededInvoices(
+  database: AppDb,
+  { allInvoices, now }: ReturnType<typeof insertSeedRows>,
+): Promise<SeededInvoiceSummary[]> {
   for (const invoice of allInvoices) {
     await refreshRisk(invoice.id, database, now);
   }
@@ -366,13 +381,16 @@ export async function seedIfEmpty(
   database: AppDb = db,
   options: SeedOptions = {},
 ): Promise<boolean> {
-  const row = database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number };
-  if (row.count > 0) {
-    console.log(`seedIfEmpty: ${row.count} invoice(s) already present — skipping seed.`);
-    return false;
-  }
-  console.log("seedIfEmpty: invoices table is empty — seeding demo data.");
-  const summaries = await seedDatabase(database, options);
+  const seed = database.$client.transaction(() => {
+    const row = database.$client.prepare("SELECT COUNT(*) AS count FROM invoices").get() as { count: number };
+    if (row.count > 0) {
+      console.log(`seedIfEmpty: ${row.count} invoice(s) already present — skipping seed.`);
+      return;
+    }
+    return insertSeedRows(database, options);
+  }).immediate();
+  if (!seed) return false;
+  const summaries = await refreshSeededInvoices(database, seed);
   console.log(`seedIfEmpty: seeded ${summaries.length} overdue invoices.`);
   return true;
 }

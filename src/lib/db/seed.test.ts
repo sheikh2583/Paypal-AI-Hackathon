@@ -242,4 +242,20 @@ describe("seedIfEmpty (D56)", () => {
       closeTestDb(database);
     }
   });
+
+  it("preserves webhook history when adding invoices to an empty workspace", async () => {
+    const { seedIfEmpty } = await import("./seed");
+    const database = createTestDb();
+    try {
+      database.$client.prepare(
+        "INSERT INTO webhook_events (id, event_type, payload_json, received_at) VALUES (?, ?, ?, ?)",
+      ).run("existing-event", "INVOICING.INVOICE.CREATED", "{}", "2026-11-10T00:00:00.000Z");
+
+      expect(await seedIfEmpty(database, { paypalMode: "mock" })).toBe(true);
+      expect(database.$client.prepare("SELECT id FROM webhook_events").all())
+        .toEqual([{ id: "existing-event" }]);
+    } finally {
+      closeTestDb(database);
+    }
+  });
 });
