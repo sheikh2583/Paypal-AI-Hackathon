@@ -29,6 +29,12 @@ type DemoMutationState = { active: boolean; nextAllowedAt: Partial<Record<DemoAc
 const processScope = globalThis as typeof globalThis & { chaserDemoMutation?: DemoMutationState };
 const mutation = processScope.chaserDemoMutation ??= { active: false, nextAllowedAt: {} };
 
+/** Reset process-scoped cooldown state between isolated tests; never called by app routes. */
+export function __resetDemoMutationStateForTests(): void {
+  mutation.active = false;
+  mutation.nextAllowedAt = {};
+}
+
 export async function withDemoMutation(action: DemoAction, run: () => Promise<Response>): Promise<Response> {
   if (!getAppEnv().demoPublic) return run();
 

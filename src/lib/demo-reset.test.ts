@@ -35,10 +35,9 @@ function snapshot(id: string, status: PayPalInvoice["status"], paidCents = 0): P
   return { paypalInvoiceId: id, number: id, status, amountCents: 31_500, paidCents };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetModules();
   vi.resetAllMocks();
-  vi.stubGlobal("chaserDemoMutation", undefined);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-10T00:00:00.000Z"));
   for (const [key, value] of Object.entries({
@@ -47,6 +46,10 @@ beforeEach(() => {
     PAYPAL_MODE: "sandbox", PAYPAL_CLIENT_ID: "fixture-client", PAYPAL_CLIENT_SECRET: "fixture-secret",
     PAYPAL_SANDBOX_MERCHANT_EMAIL: "merchant@example.com", PAYPAL_SANDBOX_BUYER_EMAIL: "buyer@example.com",
   })) vi.stubEnv(key, value);
+
+  // The public limiter intentionally lives for the process lifetime; clear its state between tests.
+  const { __resetDemoMutationStateForTests } = await import("./demo");
+  __resetDemoMutationStateForTests();
 
   const sqlite = new LibSqlite(":memory:");
   sqlite.pragma("foreign_keys = ON");
@@ -212,6 +215,19 @@ describe("public demo replay with native libSQL", () => {
     }
     vi.setSystemTime(Date.now() + 10_000);
     expect((await withDemoMutation("reset", run)).status).toBe(200);
+  });
+
+  it("allows a reset again only after the unchanged public cooldown expires", async () => {
+    const { withDemoMutation } = await import("./demo");
+    const run = vi.fn(async () => new Response());
+
+    expect((await withDemoMutation("reset", run)).status).toBe(200);
+    expect((await withDemoMutation("reset", run)).status).toBe(429);
+    expect(run).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(10_000);
+    expect((await withDemoMutation("reset", run)).status).toBe(200);
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("keeps private Sandbox reset and manual Turso seed blocked", async () => {
