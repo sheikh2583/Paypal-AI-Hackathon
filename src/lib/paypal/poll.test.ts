@@ -9,7 +9,7 @@ vi.mock("react/jsx-dev-runtime", async () => ({ jsxDEV: (await import("react/jsx
 vi.mock("@/lib/auth", () => ({ getDemoSession: async () => ({}), isDemoRequestAuthenticated: async () => true }));
 vi.mock("@/lib/clock", () => ({ getNow: () => new Date() }));
 vi.mock("@/lib/invoice-list", () => ({ listInvoiceItems: () => [] }));
-vi.mock("@/lib/db/queries", () => ({ listApprovals: () => [], listRecentWebhookEvents: () => [] }));
+vi.mock("@/lib/db/queries", () => ({ getPolicy: () => undefined, listApprovals: () => [], listRecentWebhookEvents: () => [] }));
 
 beforeEach(() => {
   vi.resetModules();

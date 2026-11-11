@@ -4,14 +4,13 @@ import { ArrowRight, CircleDollarSign, Clock3, ShieldCheck } from "lucide-react"
 import { PageHeader } from "@/components/page-header";
 import { DemoControls } from "@/components/demo-controls";
 import { db } from "@/lib/db/client";
-import { getMessages, listApprovals, listPlansByInvoiceId } from "@/lib/db/queries";
+import { getMessages, getPolicy, listApprovals, listPlansByInvoiceId, listRecentWebhookEvents } from "@/lib/db/queries";
 import { getNow } from "@/lib/clock";
 import { getDemoSession } from "@/lib/auth";
 import { demoEnabled, demoResetAvailable } from "@/lib/demo";
 import { getPayPalEnv } from "@/lib/env";
 import { listInvoiceItems } from "@/lib/invoice-list";
 import { reconcilePayPalOnRead } from "@/lib/paypal/poll";
-import { listRecentWebhookEvents } from "@/lib/db/queries";
 import { PayPalActivity } from "@/components/paypal-activity";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -24,33 +23,36 @@ export default async function DashboardPage() {
   const now = getNow();
   const pending = listApprovals("PENDING", db);
   const allInvoices = listInvoiceItems(db, now, pending);
-  const rows = allInvoices.filter(({ invoice }) => !invoice.parentInvoiceId && invoice.status !== "PAID")
+  const rows = allInvoices.filter(({ invoice }) => !invoice.parentInvoiceId && invoice.status !== "PAID" && invoice.status !== "CANCELLED")
     .sort((a, b) => (b.invoice.riskScore ?? 0) - (a.invoice.riskScore ?? 0));
   const openInvoices = allInvoices.filter(({ invoice }) => ["SENT", "OVERDUE", "PARTIALLY_PAID"].includes(invoice.status));
   const total = openInvoices.reduce((sum, { invoice }) => sum + Math.max(0, invoice.amountCents - invoice.paidCents), 0);
   const dana = rows.find(({ invoice }) => invoice.id === "invoice-dana-900");
   const danaPlan = dana ? listPlansByInvoiceId(dana.invoice.id, db)[0] : undefined;
+  const danaDepositPaid = Boolean(danaPlan && allInvoices.some(({ invoice }) =>
+    invoice.planId === danaPlan.id && invoice.installmentNo === 1 && invoice.status === "PAID"));
   const danaMessages = dana ? getMessages(dana.invoice.id, db) : [];
   const planIssued = danaPlan?.status === "ACTIVE" || danaPlan?.status === "RESOLVED";
   const danaProgress: 0 | 1 | 2 | 3 = planIssued ? 3 : danaPlan ? 2 : danaMessages.some((message) => message.direction === "agent_to_client") ? 1 : 0;
   const paypalMode = getPayPalEnv().mode;
   const webhookEvents = listRecentWebhookEvents(10, db);
+  const policy = getPolicy(db);
 
   return (
     <div className="space-y-7">
-      <PageHeader title="Good morning, Maya" description="Your overdue invoices, ranked by collection risk. Chaser only acts within the policy you set." />
+      <PageHeader title={policy?.ownerName ? `Welcome, ${policy.ownerName.split(" ")[0]}` : "Collections dashboard"} description="Track overdue invoices and payment plans. Chaser only acts within your collection policy." />
 
       <section aria-label="Portfolio summary" className="grid gap-3 sm:grid-cols-3">
         <SummaryCard icon={CircleDollarSign} label="Outstanding" value={money(total)} detail={`${openInvoices.length} open invoice records`} />
         <SummaryCard icon={Clock3} label="Waiting on you" value={String(pending.length)} detail="Pending owner approvals" />
-        <SummaryCard icon={ShieldCheck} label="Policy guardrails" value="Active" detail="30% deposit · max 3 installments · 5% discount" />
+        <SummaryCard icon={ShieldCheck} label="Policy guardrails" value={policy ? "Active" : "Unavailable"} detail={policy ? `Min ${policy.minDepositPercent}% deposit · max ${policy.maxInstallments} installments · max ${policy.maxDiscountPercent}% discount` : "Owner policy is missing"} />
       </section>
 
-      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paypalMode={paypalMode} showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
+      {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paymentComplete={danaDepositPaid} planComplete={danaPlan?.status === "RESOLVED"} paypalMode={paypalMode} showPlanLink showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b px-5 py-4">
-          <div><h2 className="font-semibold">Overdue invoices</h2><p className="mt-1 text-sm text-muted-foreground">Open an invoice to see the conversation and advance its scripted demo.</p></div>
+          <div><h2 className="font-semibold">Invoices and payment plans</h2><p className="mt-1 text-sm text-muted-foreground">Open an invoice to review its conversation and payment activity.</p></div>
           <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">{rows.length} invoices</span>
         </div>
         {rows.length === 0 ? <div className="p-8 text-center"><p className="font-medium">No demo invoices found</p><p className="mt-1 text-sm text-muted-foreground">Reset the demo to restore the seeded scenario.</p></div> : (
@@ -59,10 +61,11 @@ export default async function DashboardPage() {
               <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3 font-medium sm:px-5">Client / invoice</th><th className="px-3 py-3 font-medium sm:px-4">Amount due</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Risk</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Chase state</th><th className="hidden px-5 py-3 font-medium lg:table-cell">Next action</th></tr></thead>
               <tbody className="divide-y">
                 {rows.map(({ invoice, client, nextAction: action, riskLabel }) => {
+                  const planPaid = invoice.status === "SUPERSEDED" && invoice.chaseState === "RESOLVED";
                   return <tr key={invoice.id} className="transition hover:bg-secondary/30">
                     <td className="px-3 py-4 sm:px-5"><Link href={`/invoices/${invoice.id}`} className="group flex items-center gap-3"><span className="hidden size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-semibold text-accent-foreground sm:grid">{client.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span><span className="block font-semibold group-hover:text-primary">{client.name}<ArrowRight className="ml-1 inline size-3 opacity-0 transition group-hover:opacity-100" /></span><span className="mt-0.5 block text-xs text-muted-foreground">{invoice.number} · {invoice.description}</span></span></Link></td>
-                    <td className="px-3 py-4 font-semibold tabular-nums sm:px-4">{invoice.status === "SUPERSEDED" ? "In payment plan" : money(invoice.amountCents - invoice.paidCents)}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">{invoice.status === "SUPERSEDED" ? "Replaced by installments" : `Due ${new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</span></td>
-                    <td className="hidden px-4 py-4 lg:table-cell"><span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${riskLabel === "High" ? "bg-red-50 text-red-700" : riskLabel === "Medium" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}><span className="size-1.5 rounded-full bg-current" />{riskLabel} · {invoice.riskScore}</span></td>
+                    <td className="px-3 py-4 font-semibold tabular-nums sm:px-4">{planPaid ? money(0) : invoice.status === "SUPERSEDED" ? "In payment plan" : money(invoice.amountCents - invoice.paidCents)}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">{planPaid ? "Plan paid in full" : invoice.status === "SUPERSEDED" ? "Replaced by installments" : `Due ${new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</span></td>
+                    <td className="hidden px-4 py-4 lg:table-cell">{planPaid ? <span className="text-xs text-muted-foreground">Resolved</span> : <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${riskLabel === "High" ? "bg-red-50 text-red-700" : riskLabel === "Medium" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}><span className="size-1.5 rounded-full bg-current" />{riskLabel} · {invoice.riskScore}</span>}</td>
                     <td className="hidden px-4 py-4 lg:table-cell"><span className="rounded-md bg-secondary px-2 py-1 text-xs">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</span></td>
                     <td className="hidden px-5 py-4 lg:table-cell"><Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="ml-1 inline size-3.5" /></Link></td>
                   </tr>;

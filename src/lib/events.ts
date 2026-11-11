@@ -1,4 +1,4 @@
-export type AppEventType = "message.created" | "invoice.paid" | "invoice.updated" | "approval.created";
+export type AppEventType = "message.created" | "invoice.paid" | "invoice.updated" | "approval.created" | "paypal.webhook.processed";
 
 export interface AppEvent {
   type: AppEventType;

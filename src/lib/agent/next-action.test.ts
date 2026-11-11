@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { ApprovalRow, InvoiceRow, PlanRow } from '../types';
 import { nextAction } from './next-action';
 
-const now = new Date('2026-11-03T12:00:00.000Z');
 const invoice = (overrides: Partial<InvoiceRow> = {}): InvoiceRow => ({
   id: 'inv-1', paypalInvoiceId: null, paypalInvoiceUrl: null, clientId: 'client-1', number: 'CH-1', description: 'Service',
   amountCents: 90_000, paidCents: 0, currency: 'USD', issuedAt: '2026-10-01T00:00:00Z', dueAt: '2026-10-15T00:00:00Z',
@@ -22,10 +21,19 @@ const activePlan: PlanRow = {
 };
 
 describe('nextAction', () => {
-  it('labels a new invoice for its first reminder', () => expect(nextAction(invoice(), null, [], now)).toBe('Send first reminder'));
-  it('labels chased invoices as waiting for a client reply', () => expect(nextAction(invoice({ chaseState: 'NUDGED' }), null, [], now)).toBe('Waiting for client reply'));
-  it('labels a scheduled follow-up with its date', () => expect(nextAction(invoice({ nextFollowupAt: '2026-11-10T12:00:00.000Z' }), null, [], now)).toBe('Follow up on 2026-11-10'));
-  it('labels pending approvals', () => expect(nextAction(invoice(), null, [approval], now)).toBe('Needs your approval'));
-  it('labels an active plan with the next installment date', () => expect(nextAction(invoice(), activePlan, [], now)).toBe('Plan active — next installment due 2026-11-06'));
-  it('labels paid or resolved invoices', () => expect(nextAction(invoice({ status: 'PAID' }), null, [], now)).toBe('Paid'));
+  it('labels a new invoice for its first reminder', () => expect(nextAction(invoice(), null, [])).toBe('Send first reminder'));
+  it('labels chased invoices as waiting for a client reply', () => expect(nextAction(invoice({ chaseState: 'NUDGED' }), null, [])).toBe('Waiting for client reply'));
+  it('labels a scheduled follow-up with its date', () => expect(nextAction(invoice({ nextFollowupAt: '2026-11-10T12:00:00.000Z' }), null, [])).toBe('Follow up on 2026-11-10'));
+  it('labels pending approvals', () => expect(nextAction(invoice(), null, [approval])).toBe('Needs your approval'));
+  it('uses the earliest open installment and ignores a paid deposit and a cancelled invoice', () => {
+    const installments = [
+      invoice({ status: 'SENT', dueAt: '2026-12-06' }),
+      invoice({ status: 'PAID', dueAt: '2026-11-06' }),
+      invoice({ status: 'CANCELLED', dueAt: '2026-11-09' }),
+      invoice({ status: 'OVERDUE', dueAt: '2026-11-12' }),
+    ];
+    expect(nextAction(invoice(), activePlan, [], installments)).toBe('Plan active — next installment due 2026-11-12');
+    expect(nextAction(invoice(), activePlan, [], installments.slice(1, 3))).toBe('Review payment plan');
+  });
+  it('labels paid or resolved invoices', () => expect(nextAction(invoice({ status: 'PAID' }), null, [])).toBe('Paid'));
 });

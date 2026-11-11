@@ -7,6 +7,7 @@ import { applyClassification } from '@/lib/agent/classify';
 import { runAgent } from '@/lib/agent/run';
 import { scripts } from '@/lib/agent/scripts';
 import { guardDemoRoute, withDemoMutation } from '@/lib/demo';
+import { getPayPalEnv } from '@/lib/env';
 import { runPriyaDemoStep } from '@/lib/demo-priya';
 
 const inputSchema = z.object({ invoiceId: z.string().min(1), action: z.literal('priya-counter').optional() }).strict();
@@ -45,7 +46,10 @@ async function runDemoStep(invoiceId: string, action?: 'priya-counter'): Promise
   if (latestPlan?.status === 'RESOLVED') {
     return Response.json({ done: true, message: 'Dana’s plan is fully paid.' });
   } else if (latestPlan?.status === 'ACTIVE') {
-    return Response.json({ done: true, message: 'Dana’s plan is active. Simulate the deposit payment below to finish the walkthrough.' });
+    const message = getPayPalEnv().mode === 'sandbox'
+      ? 'Dana’s plan is active. Open Dana’s invoice and use the PayPal Sandbox link for the next unpaid installment.'
+      : 'Dana’s plan is active. Open Dana’s invoice to simulate the next unpaid installment.';
+    return Response.json({ done: true, message });
   } else if (latestPlan?.status === 'OFFERED') {
     replyText = script.clientReplies[1] ?? null;
     turn = 2;

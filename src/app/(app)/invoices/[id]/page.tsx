@@ -48,6 +48,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     : undefined;
   const overdueDays = Math.max(0, Math.floor((getNow().getTime() - Date.parse(invoice.dueAt)) / 86_400_000));
   const score = invoice.riskScore ?? computeRisk(riskFeaturesForInvoice(invoice, db, getNow())).score;
+  const superseded = invoice.status === "SUPERSEDED";
+  const planComplete = plan?.status === "RESOLVED";
+  const closed = invoice.status === "PAID" || invoice.status === "CANCELLED" || (superseded && planComplete);
+  const amountLabel = superseded ? "Original invoice amount" : invoice.status === "CANCELLED" ? "Cancelled invoice amount" : "Balance due";
+  const displayCents = superseded || invoice.status === "CANCELLED" ? invoice.amountCents : Math.max(0, invoice.amountCents - invoice.paidCents);
+  const amountDetail = superseded
+    ? planComplete ? "The installment plan was paid in full." : "Replaced by the installment invoices below."
+    : `Original amount ${money(invoice.amountCents)}${!closed && overdueDays > 0 ? ` · ${overdueDays} ${overdueDays === 1 ? "day" : "days"} overdue` : ""}`;
 
   return (
     <div className="space-y-6">
@@ -56,9 +64,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
       <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border bg-card p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm text-muted-foreground">{invoice.status === "SUPERSEDED" ? "Original invoice amount" : "Balance due"}</p><p className="mt-1 text-3xl font-semibold tracking-tight">{money(Math.max(0, invoice.amountCents - invoice.paidCents))}</p><p className="mt-2 text-sm text-muted-foreground">{invoice.status === "SUPERSEDED" ? "Replaced by the installment invoices below." : `Original amount ${money(invoice.amountCents)} · ${overdueDays} days overdue`}</p></div><span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{invoice.status.replaceAll("_", " ")}</span></div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t pt-4 text-sm"><div><p className="text-xs text-muted-foreground">Chase state</p><p className="mt-1 font-medium">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</p></div><div><p className="text-xs text-muted-foreground">Risk score</p><p className="mt-1 font-medium">{score} / 100</p></div></div>
-          {invoice.riskExplanation ? <div className="mt-4 flex gap-2 rounded-xl bg-secondary/70 p-3 text-sm"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" /><p>{invoice.riskExplanation}</p></div> : null}
+          <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm text-muted-foreground">{amountLabel}</p><p className="mt-1 text-3xl font-semibold tracking-tight">{money(displayCents)}</p><p className="mt-2 text-sm text-muted-foreground">{amountDetail}</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${invoice.status === "PAID" ? "bg-emerald-50 text-emerald-800" : closed ? "bg-secondary text-secondary-foreground" : "bg-amber-50 text-amber-800"}`}>{invoice.status.replaceAll("_", " ")}</span></div>
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t pt-4 text-sm"><div><p className="text-xs text-muted-foreground">Chase state</p><p className="mt-1 font-medium">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</p></div>{!closed ? <div><p className="text-xs text-muted-foreground">Risk score</p><p className="mt-1 font-medium">{score} / 100</p></div> : null}</div>
+          {!closed && invoice.riskExplanation ? <div className="mt-4 flex gap-2 rounded-xl bg-secondary/70 p-3 text-sm"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" /><p>{invoice.riskExplanation}</p></div> : null}
         </div>
         <div className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex items-center gap-2"><FileText className="size-4 text-primary" /><h2 className="font-semibold">Client & invoice</h2></div><dl className="mt-4 grid grid-cols-[110px_1fr] gap-y-3 text-sm"><dt className="text-muted-foreground">Client</dt><dd className="font-medium">{client.name}</dd><dt className="text-muted-foreground">Business</dt><dd>{client.notes?.split(".")[0] ?? "Client"}</dd><dt className="text-muted-foreground">Invoice</dt><dd>{invoice.number}</dd><dt className="text-muted-foreground">Due date</dt><dd>{new Date(invoice.dueAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</dd><dt className="text-muted-foreground">Responsiveness</dt><dd className="capitalize">{client.responsiveness}</dd></dl></div>
       </section>
@@ -72,6 +80,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         depositPayment={paymentTarget?.installmentNo === 1}
         paymentAmountCents={paymentTarget ? (paymentTarget.status === "PAID" ? paymentTarget.amountCents : paymentTarget.amountCents - paymentTarget.paidCents) : undefined}
         paymentComplete={isDana && deposit?.status === "PAID"}
+        planComplete={isDana && planComplete}
         progressStep={progressStep}
         stepComplete={isDana && planIssued}
         paypalMode={paypalMode}

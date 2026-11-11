@@ -3,6 +3,7 @@ import { audit } from "../audit";
 import { db } from "../db/client";
 import { getInvoiceByPayPalId, isWebhookEventPending, listPendingWebhookEvents, markWebhookEventProcessed, upsertWebhookEvent } from "../db/queries";
 import { getPayPalEnv, type PayPalEnv } from "../env";
+import { emit } from "../events";
 import { paypalFetch } from "./real";
 import { reconcilePayPalInvoice } from "./reconcile";
 import { isExpectedResetPayPalCancellation } from "./reset-cleanup";
@@ -91,6 +92,8 @@ async function processEvent(id: string, type: string, paypalInvoiceId?: string):
       input, result: { outcome }, ok: !isUnmatched,
     });
     markWebhookEventProcessed(id);
+    // Reconciliation may have applied the payment before the webhook arrived.
+    emit({ type: "paypal.webhook.processed", invoiceId: localInvoice?.id, at: new Date().toISOString() });
   } catch {
     audit({
       actor: "paypal", action: "webhook.processing.error", input,

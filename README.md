@@ -85,7 +85,7 @@ Open the hosted [Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com). It
 
 In the hosted Dana walkthrough, the guided replies are scripted. Once the plan is issued, the installment list shows the Sandbox invoice IDs and stored **Open in PayPal** links. The **PayPal activity** card lists webhook deliveries the app has received. A Sandbox buyer payment is optional. See the [judge walkthrough](docs/devpost.md#test-the-demo).
 
-For Sandbox testing, the Personal buyer account email is `sb-ciade53821110@personal.example.com`. Buyer password: **[PASTE BUYER PASSWORD]**. Do not publish a Business account password, API key, client secret, webhook token, or other secret.
+Sandbox buyer credentials for judges are in the Devpost testing instructions.
 
 ## License
 

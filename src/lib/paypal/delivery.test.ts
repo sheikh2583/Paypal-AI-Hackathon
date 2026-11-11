@@ -9,9 +9,11 @@ import { getInvoice, getPlan, insertMockPaypalInvoice, insertPlan, listAudit } f
 import { clients, invoices, webhookEvents } from "../db/schema";
 import { closeTestDb, createTestDb } from "../db/test-utils";
 import type { AppDb } from "../db/client";
+import { subscribe, type AppEvent } from "../events";
 import { clearTokenCache } from "./auth";
 import { MockPayPalClient } from "./mock";
 import { retryPendingPayPalWebhooks } from "./webhook";
+import { reconcilePayPalInvoice } from "./reconcile";
 
 const test = vi.hoisted(() => ({
   database: undefined as AppDb | undefined,
@@ -151,6 +153,27 @@ describe("PayPal webhook route", () => {
     expect(getInvoice(originalId, database)).toMatchObject({ status: "SUPERSEDED", chaseState: "RESOLVED", paidCents: 0 });
   });
 
+  it("refreshes webhook evidence after reconciliation without repeating the payment notice", async () => {
+    const paypalId = insertInvoice("already-paid");
+    await mock.simulatePayment(paypalId);
+    await reconcilePayPalInvoice(paypalId, database, mock);
+    const received: AppEvent[] = [];
+    const unsubscribe = subscribe((notification) => {
+      expect(database.select().from(webhookEvents).get()?.processedAt).toBeTruthy();
+      received.push(notification);
+    });
+    try {
+      expect((await webhook.POST(event("WH-LATE", paypalId))).status).toBe(200);
+      await flushAfter();
+      expect((await webhook.POST(event("WH-LATE", paypalId))).status).toBe(200);
+      await flushAfter();
+      expect(received).toEqual([expect.objectContaining({ type: "paypal.webhook.processed", invoiceId: "already-paid" })]);
+      expect(getInvoice("already-paid", database)?.paidCents).toBe(10_000);
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("uses authoritative partial amounts and updates cents even when the status stays the same", async () => {
     const paypalId = insertInvoice("partial");
     for (const [i, paidCents] of [1_500, 3_000].entries()) {
@@ -220,6 +243,24 @@ function useSandbox() {
 }
 
 describe("demo routes and workspace events", () => {
+  it.each([
+    ["mock", "simulate the next unpaid installment"],
+    ["sandbox", "use the PayPal Sandbox link for the next unpaid installment"],
+  ] as const)("returns %s payment instructions for an active Dana plan", async (mode, instruction) => {
+    if (mode === "sandbox") useSandbox();
+    const invoiceId = "invoice-dana-900";
+    insertInvoice(invoiceId);
+    database.update(clients).set({ persona: "dana" }).run();
+    insertPlan({
+      id: "dana-plan", invoiceId, status: "ACTIVE", totalCents: 10_000, discountPercent: 0,
+      installments: [{ no: 1, amountCents: 10_000, dueAt: DUE }],
+      createdBy: "agent", approvedBy: "policy", createdAt: NOW,
+    }, database);
+    const response = await step(post("/api/demo/step", { invoiceId }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ done: true, message: expect.stringContaining(instruction) });
+  });
+
   it.each([
     ["production", "0", 404], ["production", "1", 400], ["development", "0", 400],
     ["development", "1", 400], ["test", "0", 400], ["test", "1", 400],

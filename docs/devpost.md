@@ -44,11 +44,12 @@ Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is
 2. Open Dana Whitfield’s invoice and click **Start with a reminder**.
 3. Click **Continue to Dana’s reply** to see the scripted split request. Review the $270 deposit and two $315 installments, then click **Confirm plan and create invoices**.
 4. Review the PayPal panel and installment list. Open **Deposit** for the linked invoice’s ID and **Open in PayPal** link. The dashboard’s **PayPal activity** card lists deliveries as they arrive.
-5. Open **Audit log** to see the tool and policy decisions.
-6. Open Priya’s invoice and click **Simulate Priya’s 40% discount request**. Check **Approvals** for the escalation.
-7. On the dashboard, click **Reset demo** and confirm to restore the fictional workspace.
+5. Open the PayPal panel on any invoice to see the live Sandbox invoice ID and link, and the PayPal activity card for verified webhook events. Use an issued installment to see a linked Sandbox invoice.
+6. Open **Audit log** to see the tool and policy decisions.
+7. Open Priya’s invoice and click **Simulate Priya’s 40% discount request**. Check **Approvals** for the escalation.
+8. On the dashboard, click **Reset demo** and confirm to restore the fictional workspace.
 
-**Optional: Pay as the buyer before resetting.** Open the deposit’s **Open in PayPal** link. PayPal Sandbox asks for the Personal buyer account `sb-ciade53821110@personal.example.com` and password **[PASTE BUYER PASSWORD]**. This uses test money. Hosted invoice creation and link access were verified. End-to-end buyer payment still needs a separate check.
+**Optional: Pay as the buyer before resetting.** Open the deposit’s **Open in PayPal** link. PayPal Sandbox asks for the Personal buyer account `sb-ciade53821110@personal.example.com` and password **[PASTE BUYER PASSWORD]**. This uses test money. On Nov 11, 2026, a hosted Sandbox buyer payment produced an `INVOICING.INVOICE.PAID` webhook that Chaser verified and recorded.
 
 ## Built with
 

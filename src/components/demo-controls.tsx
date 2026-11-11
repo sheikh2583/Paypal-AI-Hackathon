@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Check, Clock3, CreditCard, LoaderCircle, Play, RotateCcw } from "lucide-react";
 
 interface DemoControlsProps {
@@ -17,6 +18,8 @@ interface DemoControlsProps {
   paymentAmountCents?: number;
   depositPayment?: boolean;
   paymentComplete?: boolean;
+  planComplete?: boolean;
+  showPlanLink?: boolean;
 }
 
 const demoSteps = ["Send reminder", "Hear Dana’s reply", "Agree and issue plan"];
@@ -25,6 +28,7 @@ const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "curren
 export function DemoControls({
   invoiceId, priyaAction, paymentInvoiceId, paypalMode, showTimeControls = false, showReset = false,
   compact = false, stepComplete = false, progressStep = 0, paymentAmountCents, depositPayment = false, paymentComplete = false,
+  planComplete = false, showPlanLink = false,
 }: DemoControlsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -113,8 +117,11 @@ export function DemoControls({
           Reset demo
         </button> : null}
       </div>
-      {paymentComplete && paypalMode === "sandbox" ? <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">Deposit paid. Dana’s plan walkthrough is complete.</p> : null}
-      {stepComplete && (!paymentInvoiceId || paypalMode === "sandbox") && !paymentComplete ? <p className="mt-3 text-sm text-muted-foreground">Open Dana’s invoice to review the schedule and {paypalMode === "mock" ? "simulate the deposit" : "pay on the PayPal Sandbox invoice page"}.</p> : null}
+      {planComplete ? <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">Dana’s plan is fully paid.</p> : null}
+      {!planComplete && paymentComplete && (paypalMode === "sandbox" || !paymentInvoiceId) ? <p role="status" className="mt-3 text-sm text-emerald-800">Deposit paid. The plan is active until all installments are paid.{showPlanLink && invoiceId ? <> <Link className="font-medium underline" href={`/invoices/${invoiceId}`}>View remaining installments</Link>.</> : null}</p> : null}
+      {stepComplete && !planComplete && !paymentComplete && (!paymentInvoiceId || paypalMode === "sandbox") ? <p className="mt-3 text-sm text-muted-foreground">
+        {showPlanLink && invoiceId ? <><Link className="font-medium text-primary hover:underline" href={`/invoices/${invoiceId}`}>Open Dana’s invoice</Link> to review the schedule and {paypalMode === "mock" ? "simulate the deposit" : "pay the deposit in PayPal Sandbox"}.</> : paypalMode === "sandbox" && paymentInvoiceId ? "Use the deposit’s Open in PayPal link below to pay in Sandbox." : "Review the installment schedule below."}
+      </p> : null}
       {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
       {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
       {confirmReset ? <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmReset(false); }}>

@@ -51,7 +51,7 @@ Backup path for the full walkthrough: `PAYPAL_MODE=mock` and scripted LLM mode, 
 
 The guided sequence uses `ScriptedLLM` regardless of provider configuration. In mock mode, the deposit control calls the demo payment route with a local invoice ID and the reconciler updates the workspace over SSE. In Sandbox, open the PayPal invoice link and pay as the Sandbox buyer.
 
-The owner authentication uses Better Auth sessions stored in SQLite. Protect `BETTER_AUTH_SECRET` and `RESEND_API_KEY` as deployment secrets. `onboarding@resend.dev` is a testing sender and is restricted to Resend's eligible test recipient; it does not enable mail to arbitrary users. Real-user delivery requires a domain you own and verify with Resend, then setting `RESEND_FROM` to that verified sender. Password reset is available from the sign-in page. Client messaging and PayPal remain simulated in the guided demo.
+The owner authentication uses Better Auth sessions stored in SQLite. Protect `BETTER_AUTH_SECRET` and `RESEND_API_KEY` as deployment secrets. `onboarding@resend.dev` is a testing sender and is restricted to Resend's eligible test recipient; it does not enable mail to arbitrary users. Real-user delivery requires a domain you own and verify with Resend, then setting `RESEND_FROM` to that verified sender. Password reset is available from the sign-in page. Client messaging is scripted in both modes. Sandbox uses PayPal’s hosted test-money checkout, and mock mode simulates payments in Chaser.
 
 ## Demo mode checklist (Person C)
 
