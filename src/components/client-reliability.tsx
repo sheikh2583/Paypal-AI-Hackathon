@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { ClientGridLoader } from "@/components/client-grid-loader";
 import { formatCents } from "@/lib/money";
 import type { ClientReliability, ReliabilityComponent } from "@/lib/types";
 
@@ -9,6 +10,31 @@ const components: [ReliabilityComponent, string][] = [
   ["behaviour", "Behaviour"],
   ["exposure", "Exposure"],
 ];
+
+/** Static fallback for browsers without JavaScript; the grid above replaces it visually. */
+function PlainTable({ results }: { results: ClientReliability[] }) {
+  return <table className="w-full min-w-[680px] text-left text-sm">
+    <thead className="bg-secondary/60 text-xs font-medium text-muted-foreground">
+      <tr>{["Rank", "Client", "Grade", "Score", "Outstanding", "Avg days late", "Why"].map((title) => <th key={title} scope="col" className="px-4 py-3">{title}</th>)}</tr>
+    </thead>
+    <tbody className="divide-y">
+      {results.map((result) => (
+        <tr key={result.client.id} className="align-top">
+          <td className="px-4 py-4 tabular-nums">{result.rank ?? "—"}</td>
+          <th scope="row" className="px-4 py-4 font-semibold">{result.client.name}</th>
+          <td className="px-4 py-4">{result.grade ?? "—"}</td>
+          <td className="px-4 py-4 tabular-nums">{result.score === null ? "Not enough data" : `${result.score}/100`}</td>
+          <td className="px-4 py-4 tabular-nums">{formatCents(result.outstandingCents)}</td>
+          <td className="px-4 py-4 tabular-nums">{result.avgDaysLate === null ? "—" : result.avgDaysLate.toFixed(1)}</td>
+          <td className="px-4 py-4">{result.rank === null ? "No due or settled obligations yet." : components.map(([key, label]) => {
+            const { points, weight, explanation } = result.breakdown[key];
+            return <p key={key}><strong>{label}</strong> · {points === null ? "No data" : `${points.toFixed(1)} of ${weight} pts`}. {explanation}</p>;
+          })}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>;
+}
 
 export function ReliabilityBadge({ result, rankedCount }: {
   result?: ClientReliability;
@@ -35,46 +61,9 @@ export function ClientReliabilityView({ results, publicDemo }: {
       {results.length === 0 ? (
         <p className="rounded-xl border bg-card p-5 text-sm">No clients yet. Client reliability will appear when there are due or settled invoices to assess.</p>
       ) : (
-        <section className="overflow-x-auto rounded-2xl border bg-card shadow-sm" aria-label="Client reliability ranking">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="bg-secondary/60 text-xs font-medium text-muted-foreground">
-              <tr>
-                {["Rank", "Client", "Grade", "Score", "Outstanding", "Avg days late", "Why"].map((title) =>
-                  <th key={title} scope="col" className="px-4 py-3">{title}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {results.map((result) => (
-                <tr key={result.client.id} className="align-top">
-                  <td className="px-4 py-4 tabular-nums">{result.rank ?? "—"}</td>
-                  <th scope="row" className="px-4 py-4 font-semibold">{result.client.name}</th>
-                  <td className="px-4 py-4">{result.grade ?? "—"}</td>
-                  <td className="px-4 py-4 tabular-nums">{result.score === null ? "Not enough data" : `${result.score}/100`}</td>
-                  <td className="px-4 py-4 tabular-nums">{formatCents(result.outstandingCents)}</td>
-                  <td className="px-4 py-4 tabular-nums">{result.avgDaysLate === null ? "—" : result.avgDaysLate.toFixed(1)}</td>
-                  <td className="px-4 py-4">
-                    <details>
-                      <summary className="cursor-pointer whitespace-nowrap font-medium text-primary">Why<span className="sr-only"> for {result.client.name}</span></summary>
-                      {result.rank === null ? <p className="mt-2 text-muted-foreground">No due or settled obligations yet.</p> : (
-                        <div className="mt-2 min-w-48 space-y-2">
-                          <dl className="space-y-2">
-                            {components.map(([key, label]) => {
-                              const { points, weight, explanation } = result.breakdown[key];
-                              return <div key={key}>
-                                <dt className="font-medium">{label} · {points === null ? "No data" : `${points.toFixed(1)} of ${weight} pts`}</dt>
-                                <dd className="text-muted-foreground">{explanation}</dd>
-                              </div>;
-                            })}
-                          </dl>
-                          <p className="text-xs text-muted-foreground">The score uses available weights. Payment timing uses the day Chaser recorded full payment.</p>
-                        </div>
-                      )}
-                    </details>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm" aria-label="Client reliability ranking">
+          <ClientGridLoader results={results} />
+          <noscript><div className="overflow-x-auto"><PlainTable results={results} /></div></noscript>
         </section>
       )}
     </div>

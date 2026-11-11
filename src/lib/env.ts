@@ -32,6 +32,8 @@ const appSchema = z.object({
   // When DEMO_PUBLIC=1, the auth gate is bypassed and the app is open to judges without login.
   // Default off; set to "1" in render.yaml for the hackathon demo deployment only.
   DEMO_PUBLIC: z.preprocess(blankToUndefined, z.enum(["0", "1"]).default("0")),
+  // Shared secret a scheduler presents in `x-chaser-cron-secret` to trigger autopilot sweeps.
+  CRON_SECRET: z.preprocess(blankToUndefined, z.string().min(16).optional()),
 });
 
 const databaseSchema = z.object({
@@ -156,6 +158,8 @@ export interface AppEnv {
    * Controlled by DEMO_PUBLIC=1 in the environment; default off.
    */
   demoPublic: boolean;
+  /** Present only when a scheduler is allowed to trigger autopilot sweeps. */
+  cronSecret: string | undefined;
 }
 
 export function getAppEnv(source: EnvSource = process.env): AppEnv {
@@ -165,6 +169,7 @@ export function getAppEnv(source: EnvSource = process.env): AppEnv {
     databasePath: e.DATABASE_PATH,
     demoNow: e.DEMO_NOW,
     demoPublic: e.DEMO_PUBLIC === "1",
+    cronSecret: e.CRON_SECRET,
   };
 }
 

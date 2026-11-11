@@ -4,9 +4,22 @@ import { CheckCircle2, Clock3, Inbox } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DemoControls } from "@/components/demo-controls";
 import { db } from "@/lib/db/client";
-import { getInvoice, listApprovals } from "@/lib/db/queries";
+import { getInvoice, listApprovals, listAudit } from "@/lib/db/queries";
 import { demoEnabled } from "@/lib/demo";
 import { getPayPalEnv } from "@/lib/env";
+import { approvalKindLabels } from "@/lib/labels";
+import { Mail } from "lucide-react";
+
+function emailedApprovalIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of listAudit(undefined, db)) {
+    if (entry.action !== "owner.notified" || !entry.ok) continue;
+    const input = entry.input as { approvalId?: unknown } | null;
+    const result = entry.result as { outcome?: unknown } | null;
+    if (typeof input?.approvalId === "string" && result?.outcome === "sent") ids.add(input.approvalId);
+  }
+  return ids;
+}
 
 export const metadata: Metadata = { title: "Approvals" };
 export const dynamic = "force-dynamic";
@@ -16,6 +29,7 @@ export default function ApprovalsPage() {
   const pending = approvals.filter((approval) => approval.status === "PENDING");
   const resolved = approvals.filter((approval) => approval.status !== "PENDING");
   const demo = demoEnabled();
+  const emailed = emailedApprovalIds();
   return (
     <div className="space-y-6">
       <PageHeader title="Approvals" description="Disputes and plans that need sign-off wait here for the owner." />
@@ -34,9 +48,10 @@ export default function ApprovalsPage() {
               <article key={approval.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-800"><Inbox className="size-4" /></span>
-                  <h2 className="font-semibold capitalize">{approval.kind.replaceAll("_", " ").toLowerCase()}</h2>
+                  <h2 className="font-semibold">{approvalKindLabels[approval.kind]}</h2>
                   <span className="ml-auto rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Pending</span>
                 </div>
+                {emailed.has(approval.id) ? <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Mail aria-hidden="true" className="size-3.5" /> Chaser emailed you about this decision.</p> : null}
                 <p className="text-sm leading-6">{approval.reason}</p>
                 <p className="text-sm text-muted-foreground">Recommendation: {approval.recommendation}</p>
                 {invoice ? <Link href={`/invoices/${invoice.id}`} className="inline-block text-sm font-semibold text-primary underline">Review {invoice.number}</Link> : null}
@@ -54,7 +69,7 @@ export default function ApprovalsPage() {
           <div className="space-y-2">
             {resolved.map((approval) => (
               <div key={approval.id} className="flex flex-wrap justify-between gap-2 rounded-xl border bg-card px-4 py-3 text-sm">
-                <span className="font-medium capitalize">{approval.kind.replaceAll("_", " ").toLowerCase()}</span>
+                <span className="font-medium">{approvalKindLabels[approval.kind]}</span>
                 <span className="text-muted-foreground">{approval.status.toLowerCase()} · {approval.ownerResponse ?? "No note"}</span>
               </div>
             ))}

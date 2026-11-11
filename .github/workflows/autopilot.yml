@@ -1,0 +1,29 @@
+name: Autopilot sweep
+
+# Triggers Chaser's scheduled sweep on the hosted demo. The endpoint only acts when
+# the owner has switched Autopilot on, so this is a no-op for a reset demo.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the run-due endpoint
+        env:
+          CHASER_URL: https://paypal-ai-hackathon-9tkr.onrender.com
+          CRON_SECRET: ${{ secrets.CHASER_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CHASER_CRON_SECRET is not set; skipping." && exit 0; fi
+          status=$(curl -sS -o response.json -w "%{http_code}" --max-time 240 \
+            -X POST "$CHASER_URL/api/agent/run-due" \
+            -H "content-type: application/json" \
+            -H "x-chaser-cron-secret: $CRON_SECRET" \
+            --data '{}')
+          echo "HTTP $status"
+          # The response holds only run outcomes and invoice IDs, never credentials.
+          cat response.json
+          test "$status" = "200"

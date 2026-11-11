@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CircleDollarSign, Clock3, ShieldCheck } from "lucide-react";
+import { CircleDollarSign, Clock3, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DemoControls } from "@/components/demo-controls";
 import { db } from "@/lib/db/client";
@@ -12,6 +12,10 @@ import { getPayPalEnv } from "@/lib/env";
 import { listInvoiceItems } from "@/lib/invoice-list";
 import { reconcilePayPalOnRead } from "@/lib/paypal/poll";
 import { PayPalActivity } from "@/components/paypal-activity";
+import { AutopilotCard } from "@/components/autopilot-card";
+import { InvoiceGridLoader } from "@/components/invoice-grid-loader";
+import { getAutopilotStatus } from "@/lib/autopilot";
+import { toInvoiceGridRow } from "@/lib/invoice-grid-rows";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -43,12 +47,14 @@ export default async function DashboardPage() {
       <PageHeader title={policy?.ownerName ? `Welcome, ${policy.ownerName.split(" ")[0]}` : "Collections dashboard"} description="Track overdue invoices and payment plans. Chaser only acts within your collection policy." />
 
       <section aria-label="Portfolio summary" className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CircleDollarSign} label="Outstanding" value={money(total)} detail={`${openInvoices.length} open invoice records`} />
+        <SummaryCard icon={CircleDollarSign} label="Outstanding" value={money(total)} detail={`${openInvoices.length} open ${openInvoices.length === 1 ? "invoice" : "invoices"}`} />
         <SummaryCard icon={Clock3} label="Waiting on you" value={String(pending.length)} detail="Pending owner approvals" />
         <SummaryCard icon={ShieldCheck} label="Policy guardrails" value={policy ? "Active" : "Unavailable"} detail={policy ? `Min ${policy.minDepositPercent}% deposit · max ${policy.maxInstallments} installments · max ${policy.maxDiscountPercent}% discount` : "Owner policy is missing"} />
       </section>
 
       {demoEnabled() ? <DemoControls invoiceId={dana?.invoice.id} progressStep={danaProgress} stepComplete={planIssued} paymentComplete={danaDepositPaid} planComplete={danaPlan?.status === "RESOLVED"} paypalMode={paypalMode} showPlanLink showTimeControls showReset={demoResetAvailable(paypalMode)} /> : null}
+
+      <AutopilotCard status={getAutopilotStatus(db)} />
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b px-5 py-4">
@@ -56,23 +62,10 @@ export default async function DashboardPage() {
           <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">{rows.length} invoices</span>
         </div>
         {rows.length === 0 ? <div className="p-8 text-center"><p className="font-medium">No demo invoices found</p><p className="mt-1 text-sm text-muted-foreground">Reset the demo to restore the seeded scenario.</p></div> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm lg:min-w-[720px]">
-              <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3 font-medium sm:px-5">Client / invoice</th><th className="px-3 py-3 font-medium sm:px-4">Amount due</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Risk</th><th className="hidden px-4 py-3 font-medium lg:table-cell">Chase state</th><th className="hidden px-5 py-3 font-medium lg:table-cell">Next action</th></tr></thead>
-              <tbody className="divide-y">
-                {rows.map(({ invoice, client, nextAction: action, riskLabel }) => {
-                  const planPaid = invoice.status === "SUPERSEDED" && invoice.chaseState === "RESOLVED";
-                  return <tr key={invoice.id} className="transition hover:bg-secondary/30">
-                    <td className="px-3 py-4 sm:px-5"><Link href={`/invoices/${invoice.id}`} className="group flex items-center gap-3"><span className="hidden size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-semibold text-accent-foreground sm:grid">{client.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span><span className="block font-semibold group-hover:text-primary">{client.name}<ArrowRight className="ml-1 inline size-3 opacity-0 transition group-hover:opacity-100" /></span><span className="mt-0.5 block text-xs text-muted-foreground">{invoice.number} · {invoice.description}</span></span></Link></td>
-                    <td className="px-3 py-4 font-semibold tabular-nums sm:px-4">{planPaid ? money(0) : invoice.status === "SUPERSEDED" ? "In payment plan" : money(invoice.amountCents - invoice.paidCents)}<span className="mt-0.5 block text-xs font-normal text-muted-foreground">{planPaid ? "Plan paid in full" : invoice.status === "SUPERSEDED" ? "Replaced by installments" : `Due ${new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}</span></td>
-                    <td className="hidden px-4 py-4 lg:table-cell">{planPaid ? <span className="text-xs text-muted-foreground">Resolved</span> : <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${riskLabel === "High" ? "bg-red-50 text-red-700" : riskLabel === "Medium" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}><span className="size-1.5 rounded-full bg-current" />{riskLabel} · {invoice.riskScore}</span>}</td>
-                    <td className="hidden px-4 py-4 lg:table-cell"><span className="rounded-md bg-secondary px-2 py-1 text-xs">{invoice.chaseState.replaceAll("_", " ").toLowerCase()}</span></td>
-                    <td className="hidden px-5 py-4 lg:table-cell"><Link href={`/invoices/${invoice.id}`} className="text-sm font-medium text-primary hover:underline">{action}<ArrowRight className="ml-1 inline size-3.5" /></Link></td>
-                  </tr>;
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <InvoiceGridLoader rows={rows.map(toInvoiceGridRow)} />
+            <noscript><ul className="divide-y px-5 text-sm">{rows.map(({ invoice, client }) => <li key={invoice.id} className="py-3"><Link href={`/invoices/${invoice.id}`} className="font-medium text-primary underline">{client.name} · {invoice.number}</Link></li>)}</ul></noscript>
+          </>
         )}
       </section>
 

@@ -10,7 +10,7 @@ Late invoices turn a small business owner's workday into awkward follow-up. I wa
 
 ## What it does
 
-Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client's reply, and proposes a payment plan inside the owner's limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox. Client reliability ranks the owner’s clients from their own invoice and payment records and explains each score. The public demo uses fictional clients and scripted conversation.
+Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client’s reply, and proposes a payment plan inside the owner’s limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox, emailing the owner when a decision is needed. An Autopilot switch lets it sweep due invoices on a schedule. With a live model configured, a judge can reply as the client in free text and watch the agent answer within policy; the guided Dana and Priya steps stay scripted so the walkthrough is repeatable. Client reliability ranks the owner’s clients from their own invoice and payment records and explains each score.
 
 ## How I built it
 
@@ -34,7 +34,7 @@ LLMs are useful for language and classification, but they should not own limits 
 
 ## What's next
 
-I would add live, free-text client replies. Cross-freelancer reliability pooling would need minimum sample sizes and a way for clients to dispute records.
+Live free-text replies work with a configured provider; next is a tuned model and prompt that passes the full live eval suite, then real client email delivery. Cross-freelancer reliability pooling would need minimum sample sizes and a way for clients to dispute records.
 
 ## Test the demo
 
@@ -53,7 +53,7 @@ Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is
 
 ## Built with
 
-Next.js, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth, Turso/libSQL, SQLite, PayPal Invoicing v2, and a scripted/configurable LLM adapter.
+Next.js, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth with Resend for owner sign-in email, Turso/libSQL, SQLite, PayPal Invoicing v2 with verified webhooks, Render for hosting, and a scripted/configurable LLM adapter.
 
 ## AI-tool disclosure to confirm
 

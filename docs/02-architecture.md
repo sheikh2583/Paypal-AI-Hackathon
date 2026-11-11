@@ -74,6 +74,11 @@ src/
     risk/{index.ts,service.ts,risk.test.ts}   # service.ts: refreshRisk + explainer
     reliability.ts                # pure reliability scoring from stored evidence
     reliability-read.ts           # scoped, read-only database projection
+    labels.ts                     # owner-facing wording for stored codes (D65)
+    notifications.ts              # Resend owner alerts on approval.created (D67)
+    autopilot.ts                  # scheduled/manual sweeps behind an owner switch (D68)
+    agent/reply.ts                # free-text client replies, live provider only (D69)
+  instrumentation.ts              # server start: registers owner notifications
     agent/{run.ts,tools.ts,prompt.ts,classify.ts,scripts.ts,next-action.ts}
     approvals/service.ts          # owner decisions on approvals (B)
     sim/client.ts                 # simulated client personas

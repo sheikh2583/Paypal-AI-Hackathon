@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mb-3 px-3 md:mb-6">
           <p className="text-lg font-semibold tracking-tight">Chaser</p>
           <p className="hidden text-xs text-muted-foreground md:block">Invoice collections agent</p>
-          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{mode === "live" ? "Live AI" : "Scripted replies"}</p>
+          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{mode === "live" ? "Live AI" : "Guided demo"}</p>
           <PayPalModeBadge mode={paypal.mode} credentialsConfigured={Boolean(paypal.clientId && paypal.clientSecret)} />
         </div>
         <AppNav demoPublic={demoPublic} />

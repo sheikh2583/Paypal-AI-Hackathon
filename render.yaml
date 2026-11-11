@@ -43,6 +43,9 @@ services:
         value: "1"
       - key: AUTH_OWNER_EMAIL
         sync: false
+      # Shared secret for the GitHub Actions autopilot schedule; optional.
+      - key: CRON_SECRET
+        sync: false
       - key: BETTER_AUTH_SECRET
         sync: false
       - key: RESEND_API_KEY

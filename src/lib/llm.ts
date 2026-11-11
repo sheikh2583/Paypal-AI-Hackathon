@@ -56,7 +56,8 @@ export interface LLM {
 
 /** Plain-fetch OpenAI Chat Completions adapter. Provider errors deliberately omit response bodies. */
 export class OpenAICompatibleLLM implements LLM {
-  constructor(private readonly baseUrl: string, private readonly apiKey: string, private readonly model: string, private readonly timeoutMs = 10_000) {}
+  // Free-tier providers regularly take 6-10 s per call; 20 s keeps one slow call from aborting a run.
+  constructor(private readonly baseUrl: string, private readonly apiKey: string, private readonly model: string, private readonly timeoutMs = 20_000) {}
 
   private async request(body: Record<string, unknown>, outerSignal?: AbortSignal): Promise<Record<string, unknown>> {
     let last: unknown;
@@ -72,7 +73,15 @@ export class OpenAICompatibleLLM implements LLM {
         });
         if (!response.ok) {
           const error = new LlmRequestError(`LLM_HTTP_${response.status}`, response.status);
-          if (attempt === 0 && retryableStatus(response.status)) { last = error; await new Promise((resolve) => setTimeout(resolve, 350)); continue; }
+          if (attempt === 0 && retryableStatus(response.status)) {
+            last = error;
+            // Honour the provider's retry-after (seconds) on 429. Each attempt has its own timeout,
+            // so the wait is bounded separately to keep a UI request under about half a minute.
+            const retryAfter = Number(response.headers.get('retry-after'));
+            const waitMs = response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 15_000) : 350;
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            continue;
+          }
           throw error;
         }
         return await response.json() as Record<string, unknown>;

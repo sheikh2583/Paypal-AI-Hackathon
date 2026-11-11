@@ -10,6 +10,10 @@ See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued pla
 
 - A risk-ranked dashboard for five fictional overdue invoices.
 - A private [client reliability ranking](docs/screenshots/client-reliability.png) with a breakdown of payment timing, installment adherence, recorded discount escalations, and overdue exposure. The public demo shows the fictional clients.
+- **Autopilot**: an owner switch that lets Chaser sweep due invoices every 30 minutes (GitHub Actions cron plus a shared secret) or on demand, within the same policy and approval rules. Off by default.
+- **Owner alerts**: when the agent needs a decision, Chaser emails the owner through Resend with a link to Approvals, and records the attempt in the audit log.
+- **Reply as the client** (live AI only): type any client message on an invoice; the model classifies it as untrusted text and the bounded agent answers within policy. The guided Dana and Priya steps stay scripted so the walkthrough is repeatable.
+- Sortable, searchable **AG Grid** tables on the dashboard and the client ranking, with a plain-language audit log that keeps every raw record one click away.
 - A guided Dana negotiation that demonstrates a 30% deposit and two remainder installments.
 - Deterministic policy limits, owner approvals for out-of-bounds requests, and an audit log.
 - PayPal Invoicing v2 integration with a mock provider for offline demos and a Sandbox provider for configured test accounts.
@@ -37,7 +41,7 @@ The safety pipeline is: **LLM proposes → Zod validates → policy engine decid
 
 ## Stack
 
-Next.js App Router, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth, and direct PayPal REST calls. Hosted persistence uses Turso/libSQL when both Turso variables are configured; local development and tests use a SQLite file through `better-sqlite3`.
+Next.js App Router, TypeScript, React, Tailwind, Zod, Drizzle, Vitest, Better Auth, and direct PayPal REST calls. Hosted persistence uses Turso/libSQL when both Turso variables are configured; local development and tests use a SQLite file through `better-sqlite3`. The public demo is hosted on Render (`render.yaml`), and owner sign-in email goes through Resend.
 
 ## Quick start (mock mode, no keys)
 
