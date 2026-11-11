@@ -28,6 +28,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   if (!client) notFound();
   const messages = getMessages(id, db);
   const plan = invoice.planId ? getPlan(invoice.planId, db) : listPlansByInvoiceId(id, db)[0] ?? null;
+  const originalCents = plan && plan.invoiceId !== id ? getInvoice(plan.invoiceId, db)?.amountCents : invoice.amountCents;
   const approvals = listApprovals(undefined, db).filter((approval) => approval.invoiceId === id);
   const siblings = plan ? listInvoicesByPlanId(plan.id, db).filter((row) => row.parentInvoiceId === plan.invoiceId) : [];
   const deposit = siblings.find((row) => row.installmentNo === 1);
@@ -42,7 +43,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const invoiceAudit = listAudit(invoice.id, db);
   const paypalEvents = invoice.paypalInvoiceId ? listWebhookEventsForPayPalInvoice(invoice.paypalInvoiceId, db) : [];
   const paypalSync = lastPayPalSync(invoiceAudit, paypalEvents);
-  const paidEvent = paypalEvents.find((event) => event.processedAt && event.eventType === "INVOICING.INVOICE.PAID");
+  const paidEvent = paypalMode === "sandbox" && invoice.status === "PAID"
+    ? paypalEvents.find((event) => event.processedAt && event.eventType === "INVOICING.INVOICE.PAID")
+    : undefined;
   const overdueDays = Math.max(0, Math.floor((getNow().getTime() - Date.parse(invoice.dueAt)) / 86_400_000));
   const score = invoice.riskScore ?? computeRisk(riskFeaturesForInvoice(invoice, db, getNow())).score;
 
@@ -75,7 +78,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         compact={!isDana}
       /> : null}
 
-      {plan ? <PlanInstallments plan={plan} siblings={siblings} invoiceId={invoice.id} originalCents={invoice.amountCents} mode={paypalMode} /> : null}
+      {plan ? <PlanInstallments plan={plan} siblings={siblings} invoiceId={invoice.id} originalCents={originalCents} mode={paypalMode} /> : null}
 
       {approvals.length > 0 ? <section className="rounded-2xl border bg-card p-5 shadow-sm"><h2 className="font-semibold">Owner approvals</h2><div className="mt-3 space-y-3">{approvals.map((approval) => <div key={approval.id} className="rounded-xl bg-secondary/60 p-4"><div className="flex flex-wrap justify-between gap-2"><p className="text-sm font-semibold">{approval.kind.replaceAll("_", " ")}</p><span className="text-xs text-muted-foreground">{approval.status.toLowerCase()}</span></div><p className="mt-2 text-sm">{approval.reason}</p><p className="mt-2 text-sm text-muted-foreground">Recommendation: {approval.recommendation}</p></div>)}</div></section> : null}
 
@@ -88,15 +91,15 @@ function PlanInstallments({ plan, siblings, invoiceId, originalCents, mode }: {
   plan: NonNullable<ReturnType<typeof getPlan>>;
   siblings: ReturnType<typeof listInvoicesByPlanId>;
   invoiceId: string;
-  originalCents: number;
+  originalCents?: number;
   mode: "mock" | "sandbox";
 }) {
-  const check = installmentCheck(plan.installments, originalCents);
+  const check = originalCents === undefined ? null : installmentCheck(plan.installments, originalCents);
   return <section className="rounded-2xl border bg-card shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"><div><h2 className="font-semibold">Payment plan</h2><p className="mt-1 text-sm text-muted-foreground">{plan.status.replaceAll("_", " ")} · {siblings.filter((row) => row.status === "PAID").length}/{plan.installments.length} installments paid · {plan.discountPercent}% discount</p></div><span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">{money(plan.totalCents)}</span></div>
-    <p className={`px-5 py-3 text-sm font-medium ${check.matchesOriginal ? "text-emerald-700" : "text-amber-800"}`}>
+    {check && originalCents !== undefined ? <p className={`px-5 py-3 text-sm font-medium ${check.matchesOriginal ? "text-emerald-700" : "text-amber-800"}`}>
       {check.matchesOriginal ? "Sum of installments = original invoice" : `Installments total ${money(check.sumCents)} · original invoice ${money(originalCents)} · ${plan.discountPercent > 0 ? "discounted plan" : "amounts differ"}`}
-    </p>
+    </p> : null}
     <div className="divide-y">{plan.installments.map((installment) => {
       const row = siblings.find((sibling) => sibling.installmentNo === installment.no);
       const realLink = mode === "sandbox" && Boolean(row?.paypalInvoiceId && row.paypalInvoiceUrl && !row.paypalInvoiceId.startsWith("MOCK-"));
