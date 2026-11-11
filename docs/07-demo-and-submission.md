@@ -44,7 +44,7 @@ Backup path for the full walkthrough: `PAYPAL_MODE=mock` and scripted LLM mode, 
 
 ### Presenter setup and click path
 
-1. Use the [no-key mock quick start](../README.md#quick-start) locally. On the hosted demo, open the dashboard with `DEMO_PUBLIC=1`. For a private workspace, configure owner authentication and sign in through `/setup` and `/login`.
+1. Use the [no-key mock quick start](../README.md#quick-start-mock-mode-no-keys) locally. On the hosted demo, open the dashboard with `DEMO_PUBLIC=1`. For a private workspace, configure owner authentication and sign in through `/setup` and `/login`.
 2. The Dashboard shows the five fictional overdue invoices, risk levels, current chase states, and next actions. Use the Policy page to explain the owner's boundaries.
 3. In “Walk through Dana’s payment plan,” the three highlighted stages show progress. Click the stage-specific button once per step; the latest action and any scripted client reply appear below it. The plan numbers are generated under policy and should be explained as a $270 deposit plus two $315 installments.
 4. Open Dana's invoice to show the conversation and installment schedule. Click the clearly labelled mock deposit payment button to finish the payment segment. Use “Reset demo” after the presentation to open the in-app confirmation dialog, restore the fictional seed state, and clear the accumulated demo activity.

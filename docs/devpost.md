@@ -34,11 +34,21 @@ LLMs are useful for language and classification, but they should not own limits 
 
 ## What's next
 
-I would add real client channels, more currencies, and more payment providers after the single-owner demo is proven. Live PayPal is intentionally out of scope; the current integration is for mock money and PayPal Sandbox test money only.
+I would add live, free-text client replies and a payment behavior score that ranks clients by how late they pay and how they respond to reminders or payment plans. The guided replies today are scripted.
 
-## Try it
+## Test the demo
 
-The hosted demo is [paypal-ai-hackathon-9tkr.onrender.com](https://paypal-ai-hackathon-9tkr.onrender.com). It uses fictional data, free hosting, and public demo mode; the first request can take about a minute. The default walkthrough uses mock PayPal. I did not treat a real Sandbox payment as verified for this write-up unless the separate hosted Sandbox run is rechecked.
+Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal.
+
+1. Start on the dashboard. A reset workspace shows five overdue invoices totaling $5,500.
+2. Open Dana Whitfield’s invoice and click **Start with a reminder**.
+3. Click **Continue to Dana’s reply** to see the scripted split request. Review the $270 deposit and two $315 installments, then click **Confirm plan and create invoices**.
+4. Review the PayPal panel and installment list. Open **Deposit** for the linked invoice’s ID and **Open in PayPal** link. The dashboard’s **PayPal activity** card lists deliveries as they arrive.
+5. Open **Audit log** to see the tool and policy decisions.
+6. Open Priya’s invoice and click **Simulate Priya’s 40% discount request**. Check **Approvals** for the escalation.
+7. On the dashboard, click **Reset demo** and confirm to restore the fictional workspace.
+
+**Optional: Pay as the buyer before resetting.** Open the deposit’s **Open in PayPal** link. PayPal Sandbox asks for the Personal buyer account `sb-ciade53821110@personal.example.com` and password **[PASTE BUYER PASSWORD]**. This uses test money. Hosted invoice creation and link access were verified. End-to-end buyer payment still needs a separate check.
 
 ## Built with
 

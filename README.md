@@ -4,13 +4,15 @@ Chaser is an AI collections agent for freelancers and micro-businesses: it follo
 
 ![Chaser dashboard](docs/screenshots/dashboard.png)
 
+See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued plan and PayPal panel](docs/screenshots/invoice-paypal.png), [PayPal activity](docs/screenshots/paypal-activity.png), the [approvals inbox](docs/screenshots/approvals.png), and the [audit log](docs/screenshots/audit.png). These screenshots use local mock PayPal, including the test webhook in the activity feed.
+
 ## What is here
 
 - A risk-ranked dashboard for five fictional overdue invoices.
 - A guided Dana negotiation that demonstrates a 30% deposit and two remainder installments.
 - Deterministic policy limits, owner approvals for out-of-bounds requests, and an audit log.
 - PayPal Invoicing v2 integration with a mock provider for offline demos and a Sandbox provider for configured test accounts.
-- Webhook handling plus polling reconciliation for invoice state.
+- A PayPal panel with stored invoice IDs and recipient links when available, installment amounts and statuses, and a dashboard activity feed for received webhooks. Webhooks and polling reconcile invoice state.
 - Scripted client replies for a repeatable demo, with an adapter for a configured live LLM.
 - Better Auth owner setup for private deployments. Public demo mode bypasses the auth gate for the fictional workspace.
 
@@ -79,10 +81,12 @@ Client messaging is a simulated conversation. The default quick start uses mock 
 
 ## Try it
 
-Open the hosted [Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com). It is free hosting, uses fictional data, and is intended to be browsed without login in public demo mode. The first load can take about a minute after the service sleeps. Owner authentication exists for private deployments but is switched off in the public demo configuration.
+Open the hosted [Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com). It runs **PayPal Sandbox** with fictional data and no Chaser login. Allow about a minute for Render Free to wake after idle time. The local `pnpm dev` quick start runs **mock PayPal** without credentials. Owner authentication is available for private deployments.
+
+In the hosted Dana walkthrough, the guided replies are scripted. Once the plan is issued, the installment list shows the Sandbox invoice IDs and stored **Open in PayPal** links. The **PayPal activity** card lists webhook deliveries the app has received. A Sandbox buyer payment is optional. See the [judge walkthrough](docs/devpost.md#test-the-demo).
 
 For Sandbox testing, the Personal buyer account email is `sb-ciade53821110@personal.example.com`. Buyer password: **[PASTE BUYER PASSWORD]**. Do not publish a Business account password, API key, client secret, webhook token, or other secret.
 
 ## License
 
-MIT. GitHub recognizes the root `LICENSE` file and its standard MIT text as an MIT license once this file is pushed.
+Distributed under the [MIT License](LICENSE). Source code is on [GitHub](https://github.com/sheikh2583/Paypal-AI-Hackathon).
