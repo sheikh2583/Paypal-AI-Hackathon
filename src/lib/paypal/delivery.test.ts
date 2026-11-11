@@ -111,7 +111,7 @@ describe("PayPal webhook route", () => {
     vi.stubEnv("DEMO_PUBLIC", demoPublic);
     expect((await webhook.POST(event("WH-ANON", "MOCK-UNKNOWN"))).status).toBe(200);
     await flushAfter();
-    expect(listAudit(undefined, database)[0]).toMatchObject({ actor: "paypal", action: "webhook.invoice.unknown" });
+    expect(listAudit(undefined, database)[0]).toMatchObject({ actor: "paypal", action: "webhook.invoice.unmatched", ok: false });
   });
 
   it("rejects a missing mock header without writing an event", async () => {

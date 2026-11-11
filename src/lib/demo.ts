@@ -8,6 +8,7 @@ import { resetPublicDemoSeed, seedDatabase } from "./db/seed";
 import { getAppEnv, getDatabaseEnv, getPayPalEnv } from "./env";
 import { emit } from "./events";
 import { getPayPal } from "./paypal";
+import { rememberResetPayPalCancellations } from "./paypal/reset-cleanup";
 import { refreshRisk } from "./risk/service";
 
 export function demoEnabled(): boolean {
@@ -68,7 +69,10 @@ export async function resetDemo(database: AppDb = db): Promise<Response> {
     const invoices = isPublic
       ? await resetPublicDemoSeed(database, { paypalMode: mode, sandboxBuyerEmail: buyerEmail })
       : await seedDatabase(database, { paypalMode: "mock" });
-    if (paypalIds.length > 0) after(() => cancelResetPayPalInvoices(paypalIds, database));
+    if (paypalIds.length > 0) {
+      rememberResetPayPalCancellations(paypalIds, database);
+      after(() => cancelResetPayPalInvoices(paypalIds, database));
+    }
     emit({ type: "invoice.updated", at: getNow(database).toISOString() });
     return Response.json({ reset: true, invoiceCount: invoices.length });
   } catch {

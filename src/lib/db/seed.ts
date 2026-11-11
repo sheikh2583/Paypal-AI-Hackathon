@@ -180,7 +180,10 @@ export async function resetPublicDemoSeed(database: AppDb, options: SeedOptions)
 
 async function replaceBusinessSeed(database: AppDb, options: SeedOptions, suppliedNow?: Date) {
   const seed = database.$client.transaction(() => {
-    database.$client.exec(businessTables.map((table) => `DELETE FROM ${table};`).join("\n"));
+    const resetTables = businessTables.filter((table) => table !== "kv");
+    database.$client.exec(resetTables.map((table) => `DELETE FROM ${table};`).join("\n"));
+    // Keep PayPal reset-cancellation correlation across demo resets, but clear demo clock state.
+    database.$client.exec("DELETE FROM kv WHERE key != 'paypal_reset_cleanup';");
     return insertSeedRows(database, options, suppliedNow);
   }).immediate();
   return refreshSeededInvoices(database, seed);

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { audit } from "../audit";
 import { db } from "../db/client";
-import { isWebhookEventPending, listPendingWebhookEvents, markWebhookEventProcessed, upsertWebhookEvent } from "../db/queries";
+import { getInvoiceByPayPalId, isWebhookEventPending, listPendingWebhookEvents, markWebhookEventProcessed, upsertWebhookEvent } from "../db/queries";
 import { getPayPalEnv, type PayPalEnv } from "../env";
 import { paypalFetch } from "./real";
 import { reconcilePayPalInvoice } from "./reconcile";
+import { isExpectedResetPayPalCancellation } from "./reset-cleanup";
 
 const identifier = z.string().min(1).max(128).regex(/^[a-z0-9_-]+$/i);
 const invoiceRef = z.object({ id: identifier.optional() });
@@ -74,12 +75,20 @@ async function processEvent(id: string, type: string, paypalInvoiceId?: string):
   inFlight.add(id);
   const input = { eventId: id, eventType: type, paypalInvoiceId };
   try {
+    const localInvoice = paypalInvoiceId ? getInvoiceByPayPalId(paypalInvoiceId, db) : undefined;
+    const expectedResetCancellation = !localInvoice && type === "INVOICING.INVOICE.CANCELLED"
+      && paypalInvoiceId !== undefined && isExpectedResetPayPalCancellation(paypalInvoiceId, db);
     const outcome = !supportedEvents.has(type) ? "unsupported_event"
-      : !paypalInvoiceId ? "unknown"
-        : await reconcilePayPalInvoice(paypalInvoiceId);
+      : !paypalInvoiceId ? "missing_invoice_id"
+        : expectedResetCancellation ? "expected_reset_cancellation"
+          : !localInvoice ? "unmatched_invoice"
+            : await reconcilePayPalInvoice(paypalInvoiceId);
+    const isUnmatched = outcome === "missing_invoice_id" || outcome === "unmatched_invoice";
     audit({
-      actor: "paypal", action: outcome === "unknown" ? "webhook.invoice.unknown" : "webhook.processed",
-      input, result: { outcome }, ok: true,
+      actor: "paypal",
+      action: outcome === "expected_reset_cancellation" ? "webhook.demo_reset.cancellation"
+        : isUnmatched ? "webhook.invoice.unmatched" : "webhook.processed",
+      input, result: { outcome }, ok: !isUnmatched,
     });
     markWebhookEventProcessed(id);
   } catch {
