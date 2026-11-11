@@ -13,7 +13,7 @@ See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued pla
 - **Autopilot**: an owner switch that lets Chaser sweep due invoices every 30 minutes (GitHub Actions cron plus a shared secret) or on demand, within the same policy and approval rules. Off by default.
 - **Owner alerts**: when the agent needs a decision, Chaser emails the owner through Resend with a link to Approvals, and records the attempt in the audit log.
 - **Reply as the client** (live AI only): type any client message on an invoice; the model classifies it as untrusted text and the bounded agent answers within policy. The guided Dana and Priya steps stay scripted so the walkthrough is repeatable.
-- Sortable, searchable **AG Grid** tables on the dashboard and the client ranking, with a plain-language audit log that keeps every raw record one click away.
+- Sortable, searchable [AG Grid](docs/screenshots/dashboard-grid.png) tables on the dashboard and the client ranking, with a plain-language [audit log](docs/screenshots/audit.png) that keeps every raw record one click away.
 - A guided Dana negotiation that demonstrates a 30% deposit and two remainder installments.
 - Deterministic policy limits, owner approvals for out-of-bounds requests, and an audit log.
 - PayPal Invoicing v2 integration with a mock provider for offline demos and a Sandbox provider for configured test accounts.
