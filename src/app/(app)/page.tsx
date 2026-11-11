@@ -11,6 +11,8 @@ import { demoEnabled, demoResetAvailable } from "@/lib/demo";
 import { getPayPalEnv } from "@/lib/env";
 import { listInvoiceItems } from "@/lib/invoice-list";
 import { reconcilePayPalOnRead } from "@/lib/paypal/poll";
+import { listRecentWebhookEvents } from "@/lib/db/queries";
+import { PayPalActivity } from "@/components/paypal-activity";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
   const planIssued = danaPlan?.status === "ACTIVE" || danaPlan?.status === "RESOLVED";
   const danaProgress: 0 | 1 | 2 | 3 = planIssued ? 3 : danaPlan ? 2 : danaMessages.some((message) => message.direction === "agent_to_client") ? 1 : 0;
   const paypalMode = getPayPalEnv().mode;
+  const webhookEvents = listRecentWebhookEvents(10, db);
 
   return (
     <div className="space-y-7">
@@ -70,7 +73,8 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <p className="text-center text-xs text-muted-foreground">Demo workspace · fictional clients · PayPal {paypalMode} mode</p>
+      <PayPalActivity events={webhookEvents} />
+      <p className="text-center text-xs text-muted-foreground">{paypalMode === "sandbox" ? "Invoicing and payments by the PayPal Sandbox. No real money moves." : "Simulated PayPal. No real money moves."}</p>
     </div>
   );
 }

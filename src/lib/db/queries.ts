@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import type {
   ApprovalKind,
   ApprovalRow,
@@ -379,6 +379,33 @@ export function isWebhookEventPending(id: string, database: AppDb = db): boolean
 export function listPendingWebhookEvents(database: AppDb = db) {
   return database.select().from(webhookEvents).where(isNull(webhookEvents.processedAt))
     .orderBy(webhookEvents.receivedAt).limit(25).all();
+}
+
+/** Read-only event history for the dashboard. Rows exist only after the configured verifier accepts them. */
+export function listRecentWebhookEvents(limit = 10, database: AppDb = db) {
+  return database.select().from(webhookEvents)
+    .orderBy(desc(webhookEvents.receivedAt), desc(webhookEvents.id)).limit(limit).all()
+    .map((event) => {
+      const payload = parseJson<{ paypalInvoiceId?: string } | null>(event.payloadJson, null);
+      const invoice = payload?.paypalInvoiceId ? getInvoiceByPayPalId(payload.paypalInvoiceId, database) : undefined;
+      return {
+        id: event.id,
+        eventType: event.eventType,
+        paypalInvoiceId: payload?.paypalInvoiceId ?? null,
+        receivedAt: event.receivedAt,
+        processedAt: event.processedAt,
+        invoiceId: invoice?.id ?? null,
+        invoiceNumber: invoice?.number ?? null,
+      };
+    });
+}
+
+/** Read-only webhook history tied to one provider invoice id. */
+export function listWebhookEventsForPayPalInvoice(paypalInvoiceId: string, database: AppDb = db) {
+  return database.select().from(webhookEvents)
+    .where(sql`json_extract(${webhookEvents.payloadJson}, '$.paypalInvoiceId') = ${paypalInvoiceId}`)
+    .orderBy(desc(webhookEvents.receivedAt), desc(webhookEvents.id)).all()
+    .map((event) => ({ id: event.id, eventType: event.eventType, receivedAt: event.receivedAt, processedAt: event.processedAt }));
 }
 
 export function getKv(key: string, database: AppDb = db): string | undefined {
