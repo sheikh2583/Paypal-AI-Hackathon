@@ -9,6 +9,7 @@ See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued pla
 ## What is here
 
 - A risk-ranked dashboard for five fictional overdue invoices.
+- A private [client reliability ranking](docs/screenshots/client-reliability.png) with a breakdown of payment timing, installment adherence, recorded discount escalations, and overdue exposure. The public demo shows the fictional clients.
 - A guided Dana negotiation that demonstrates a 30% deposit and two remainder installments.
 - Deterministic policy limits, owner approvals for out-of-bounds requests, and an audit log.
 - PayPal Invoicing v2 integration with a mock provider for offline demos and a Sandbox provider for configured test accounts.
@@ -86,6 +87,10 @@ Open the hosted [Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com). It
 In the hosted Dana walkthrough, the guided replies are scripted. Once the plan is issued, the installment list shows the Sandbox invoice IDs and stored **Open in PayPal** links. The **PayPal activity** card lists webhook deliveries the app has received. A Sandbox buyer payment is optional. See the [judge walkthrough](docs/devpost.md#test-the-demo).
 
 Sandbox buyer credentials for judges are in the Devpost testing instructions.
+
+## What’s next
+
+Cross-freelancer reliability pooling would need minimum sample sizes and a way for clients to dispute records.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, LayoutDashboard, LoaderCircle, LogOut, ScrollText, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Inbox, LayoutDashboard, LoaderCircle, LogOut, ScrollText, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
@@ -17,6 +17,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, alsoActiveFor: ["/invoices"] },
+  { href: "/clients", label: "Client reliability", icon: Users },
   { href: "/approvals", label: "Approvals", icon: Inbox },
   { href: "/policy", label: "Policy", icon: SlidersHorizontal },
   { href: "/audit", label: "Audit log", icon: ScrollText },

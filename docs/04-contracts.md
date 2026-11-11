@@ -236,3 +236,7 @@ All owner pages, mock invoice pages, and mutation APIs require a verified single
 Demo routes return `404` in production unless `DEMO_PUBLIC=1`. Enabled routes use the workspace access gate, which permits guests in public mode. Public demo mutations are rate-limited per process and return `429` with `Retry-After` if busy or cooling down. In an active plan, paid installment count and the next due installment come from the invoice rows. When all installments are paid, the plan and the original invoice's chase state become `RESOLVED`. The original payment status stays `SUPERSEDED` so installment amounts are counted once.
 
 Error shape for all routes: `{ error: { code: string, message: string } }` with an appropriate HTTP status.
+
+## Client reliability read model
+
+`/clients` and the invoice badge share the server-side `ClientReliability` view. Inputs are the client ID and name, invoice or installment ID, client ID, due date, status and integer cents, and linked `payment_observed` or `discount_escalation` events. Results include score, grade, rank, outstanding cents, average days late and a named four-component breakdown with points, weight and explanation. Null score, grade and rank denote an unranked client. A null component means that its input is unavailable. The view exposes no new API and uses the same workspace access gate as the other owner pages. See D64 for the calculation.

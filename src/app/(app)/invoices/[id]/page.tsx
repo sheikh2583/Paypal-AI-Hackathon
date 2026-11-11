@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText, MessageCircle, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DemoControls } from "@/components/demo-controls";
+import { ReliabilityBadge } from "@/components/client-reliability";
 import { getNow } from "@/lib/clock";
 import { demoEnabled } from "@/lib/demo";
 import { getPayPalEnv } from "@/lib/env";
@@ -15,6 +16,7 @@ import { PayPalInvoicePanel } from "@/components/paypal-invoice-panel";
 import { PayPalCopyId } from "@/components/paypal-copy-id";
 import { PayPalPaidToast } from "@/components/paypal-paid-toast";
 import { installmentCheck, lastPayPalSync } from "@/lib/paypal/display";
+import { loadClientReliability } from "@/lib/reliability-read";
 
 export const metadata: Metadata = { title: "Invoice" };
 export const dynamic = "force-dynamic";
@@ -26,6 +28,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   if (!invoice) notFound();
   const client = getClient(invoice.clientId, db);
   if (!client) notFound();
+  const reliability = await loadClientReliability();
   const messages = getMessages(id, db);
   const plan = invoice.planId ? getPlan(invoice.planId, db) : listPlansByInvoiceId(id, db)[0] ?? null;
   const originalCents = plan && plan.invoiceId !== id ? getInvoice(plan.invoiceId, db)?.amountCents : invoice.amountCents;
@@ -60,7 +63,13 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="space-y-6">
       <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> All invoices</Link>
-      <PageHeader title={invoice.number} description={`${client.name} · ${invoice.description}`} />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <PageHeader title={invoice.number} description={`${client.name} · ${invoice.description}`} />
+        {reliability ? <ReliabilityBadge
+          result={reliability.find((result) => result.client.id === client.id)}
+          rankedCount={reliability.filter((result) => result.rank !== null).length}
+        /> : null}
+      </div>
 
       <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border bg-card p-5 shadow-sm">

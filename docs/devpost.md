@@ -10,7 +10,7 @@ Late invoices turn a small business owner's workday into awkward follow-up. I wa
 
 ## What it does
 
-Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client's reply, and proposes a payment plan inside the owner's limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox. The UI conversation is simulated; it is not email or SMS delivery.
+Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client's reply, and proposes a payment plan inside the owner's limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox. Client reliability ranks the owner’s clients from their own invoice and payment records and explains each score. The public demo uses fictional clients and scripted conversation.
 
 ## How I built it
 
@@ -34,7 +34,7 @@ LLMs are useful for language and classification, but they should not own limits 
 
 ## What's next
 
-I would add live, free-text client replies and a payment behavior score that ranks clients by how late they pay and how they respond to reminders or payment plans. The guided replies today are scripted.
+I would add live, free-text client replies. Cross-freelancer reliability pooling would need minimum sample sizes and a way for clients to dispute records.
 
 ## Test the demo
 

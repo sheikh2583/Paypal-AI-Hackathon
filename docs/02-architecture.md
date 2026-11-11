@@ -39,6 +39,7 @@ src/
     (app)/
       page.tsx                    # dashboard
       invoices/[id]/page.tsx      # invoice detail + conversation + simulated client
+      clients/page.tsx            # owner workspace reliability ranking
       approvals/page.tsx
       policy/page.tsx
       audit/page.tsx
@@ -71,6 +72,8 @@ src/
     paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}
     policy/{index.ts,plan.ts,policy.test.ts}
     risk/{index.ts,service.ts,risk.test.ts}   # service.ts: refreshRisk + explainer
+    reliability.ts                # pure reliability scoring from stored evidence
+    reliability-read.ts           # scoped, read-only database projection
     agent/{run.ts,tools.ts,prompt.ts,classify.ts,scripts.ts,next-action.ts}
     approvals/service.ts          # owner decisions on approvals (B)
     sim/client.ts                 # simulated client personas

@@ -116,6 +116,20 @@ export interface AuditEntry {
   input: unknown; result: unknown; ok: boolean; // redacted
 }
 
+export type ReliabilityClient = Pick<ClientRow, 'id' | 'name'>;
+export type ReliabilityInvoice = Pick<InvoiceRow, 'id' | 'clientId' | 'dueAt' | 'amountCents' | 'paidCents' | 'status'>;
+export type ReliabilityEvent = { invoiceId: string; at: string; kind: 'payment_observed' | 'discount_escalation' };
+export type ReliabilityComponent = 'timeliness' | 'planAdherence' | 'behaviour' | 'exposure';
+export interface ClientReliability {
+  client: ReliabilityClient;
+  score: number | null;
+  grade: 'A' | 'B' | 'C' | 'D' | null;
+  rank: number | null;
+  outstandingCents: Cents;
+  avgDaysLate: number | null;
+  breakdown: Record<ReliabilityComponent, { points: number | null; weight: number; explanation: string }>;
+}
+
 export interface InvoiceListItem {
   invoice: InvoiceRow; client: ClientRow;
   daysOverdue: number; riskLabel: 'Low' | 'Medium' | 'High';
