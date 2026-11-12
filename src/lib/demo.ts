@@ -9,6 +9,7 @@ import { getAppEnv, getDatabaseEnv, getPayPalEnv } from "./env";
 import { emit } from "./events";
 import { getPayPal } from "./paypal";
 import { rememberResetPayPalCancellations } from "./paypal/reset-cleanup";
+import { PayPalError } from "./paypal/real";
 import { refreshRisk } from "./risk/service";
 
 export function demoEnabled(): boolean {
@@ -89,9 +90,11 @@ async function cancelResetPayPalInvoices(paypalIds: string[], database: AppDb): 
       if (invoice.paidCents !== 0 || (invoice.status !== "SENT" && invoice.status !== "DRAFT")) continue;
       stage = "cancel";
       await paypal.cancelInvoice(paypalInvoiceId);
-    } catch {
+    } catch (error) {
+      // Keep the HTTP status so a failed cleanup can be diagnosed from the audit log alone.
+      const httpStatus = error instanceof PayPalError ? error.status : undefined;
       try {
-        audit({ actor: "paypal", action: "demo.reset.cancel_invoice", input: { paypalInvoiceId }, result: { stage }, ok: false }, database, new Date().toISOString());
+        audit({ actor: "paypal", action: "demo.reset.cancel_invoice", input: { paypalInvoiceId }, result: { stage, ...(httpStatus ? { httpStatus } : {}) }, ok: false }, database, new Date().toISOString());
       } catch {
         console.warn("Could not record PayPal invoice cleanup failure during demo reset.");
       }

@@ -172,9 +172,15 @@ export class RealPayPalClient implements PayPalClient {
     );
 
     // 204 No Content is success. 200 is also accepted.
-    if (response.status !== 204 && response.status !== 200) {
-      throw new PayPalError(response.status, `Cancel invoice returned HTTP ${response.status}`);
+    if (response.status === 204 || response.status === 200) return;
+    // PayPal refuses to cancel an invoice it has not sent yet (DRAFT or SCHEDULED);
+    // those are withdrawn by deleting them, which leaves the payer nothing to pay.
+    if (response.status === 422) {
+      const removed = await paypalFetch(`${this.env.baseUrl}/v2/invoicing/invoices/${paypalInvoiceId}`, { method: "DELETE" }, this.env);
+      if (removed.status === 204 || removed.status === 200) return;
+      throw new PayPalError(removed.status, `Delete unsent invoice returned HTTP ${removed.status}`);
     }
+    throw new PayPalError(response.status, `Cancel invoice returned HTTP ${response.status}`);
   }
 
   // simulatePayment is mock-only; throw in real mode.

@@ -127,6 +127,16 @@ export function mapGetResponseToInvoice(
 }
 
 /**
+ * PayPal reads invoice_date in the merchant account's own time zone and holds a
+ * future-dated invoice as SCHEDULED: unpayable, and refused by the cancel call.
+ * The UTC date runs up to a day ahead of the Americas, so the date is taken in
+ * UTC−12, which is never later than the merchant's local date anywhere.
+ */
+export function invoiceDateForPayPal(now: Date = new Date()): string {
+  return new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/**
  * Maps our CreateInvoiceInput to the PayPal Invoicing v2 request body.
  * Amount is a single line-item at quantity 1.
  * Uses DUE_ON_DATE_SPECIFIED with the invoice's dueAt date.
@@ -144,7 +154,7 @@ export function buildCreateInvoiceBody(
   return {
     detail: {
       invoice_number: input.number,
-      invoice_date: new Date().toISOString().slice(0, 10),
+      invoice_date: invoiceDateForPayPal(),
       currency_code: "USD",
       ...(input.note ? { note: input.note } : {}),
       payment_term: {
