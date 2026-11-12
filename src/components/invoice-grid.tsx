@@ -68,7 +68,8 @@ function RiskCell({ data }: ICellRendererParams<InvoiceGridRow>) {
 
 function ActionCell({ data }: ICellRendererParams<InvoiceGridRow>) {
   if (!data) return null;
-  return <span className="inline-flex items-center text-sm font-medium text-primary">{data.nextAction}<ArrowRight className="ml-1 inline size-3.5" aria-hidden="true" /></span>;
+  // Wrap onto a second line instead of clipping; the 64 px rows have room for two.
+  return <span className="flex h-full items-center whitespace-normal text-sm font-medium leading-snug text-primary"><span>{data.nextAction}<ArrowRight className="ml-1 inline size-3.5 align-[-2px]" aria-hidden="true" /></span></span>;
 }
 
 export function InvoiceGrid({ rows }: { rows: InvoiceGridRow[] }) {
