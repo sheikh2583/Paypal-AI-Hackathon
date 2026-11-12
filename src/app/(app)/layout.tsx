@@ -5,12 +5,15 @@ import { getAppEnv, getLlmEnv, getPayPalEnv } from "@/lib/env";
 import { llmProviderLabel } from "@/lib/labels";
 import { redirect } from "next/navigation";
 import { PayPalModeBadge } from "@/components/paypal-mode-badge";
+import { db } from "@/lib/db/client";
+import { getPolicy } from "@/lib/db/queries";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!(await getDemoSession())) redirect("/login");
   const { demoPublic } = getAppEnv();
   const llm = getLlmEnv();
   const paypal = getPayPalEnv();
+  const policy = getPolicy(db);
   return (
     <div className="min-h-screen md:flex">
       <LiveUpdates />
@@ -28,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <p title={llm.mode === "live" ? "Chaser's messages are written by a live AI model." : "Chaser's messages follow a script."} className="inline-flex rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground md:mt-2 md:text-sm">{llm.mode === "live" ? `Live AI · ${llmProviderLabel(llm)}` : "Guided demo"}</p>
           <PayPalModeBadge mode={paypal.mode} credentialsConfigured={Boolean(paypal.clientId && paypal.clientSecret)} />
         </div>
-        <AppNav demoPublic={demoPublic} />
+        <AppNav demoPublic={demoPublic} account={policy ? { name: policy.ownerName, business: policy.businessName } : undefined} />
       </aside>
 
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 md:p-8">

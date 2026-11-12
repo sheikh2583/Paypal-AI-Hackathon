@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, CircleDollarSign } from "lucide-react";
+import { CircleDollarSign } from "lucide-react";
 import { paypalEventLabel } from "@/lib/labels";
 
 export type PayPalActivityRow = {
@@ -22,7 +22,7 @@ export function PayPalActivity({ events }: { events: PayPalActivityRow[] }) {
   }
   return <section aria-labelledby="paypal-activity-title" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
-      <div><div className="flex items-center gap-2"><CircleDollarSign className="size-4 text-primary" /><h2 id="paypal-activity-title" className="font-semibold">PayPal activity</h2></div><p className="mt-1 text-xs text-muted-foreground">What PayPal told Chaser about these invoices. Chaser checks that each message really came from PayPal before using it.</p></div>
+      <div><div className="flex items-center gap-2"><CircleDollarSign className="size-4 text-primary" /><h2 id="paypal-activity-title" className="font-semibold">PayPal activity</h2></div><p className="mt-1 text-xs text-muted-foreground">What PayPal told Chaser about these invoices. Only updates whose PayPal signature checks out are shown or used.</p></div>
       <span className="text-xs text-muted-foreground">{events.length} recent {events.length === 1 ? "update" : "updates"}</span>
     </div>
     <ol className="divide-y">
@@ -30,7 +30,6 @@ export function PayPalActivity({ events }: { events: PayPalActivityRow[] }) {
         <div className="min-w-0">
           <p className="font-medium">{paypalEventLabel(event.eventType)}</p>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 aria-hidden="true" className="size-3.5" />Verified as from PayPal</span>
             {event.invoiceId && event.invoiceNumber ? <Link href={`/invoices/${event.invoiceId}`} className="font-medium text-primary hover:underline">{event.invoiceNumber}</Link> : null}
             {event.paypalInvoiceId ? <span className="break-all">PayPal {event.paypalInvoiceId}</span> : null}
           </p>

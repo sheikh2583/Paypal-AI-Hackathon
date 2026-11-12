@@ -130,10 +130,9 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
             }} className="mb-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
               {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo: open Maya&apos;s workspace
             </button> : null}
-            {demoDisplay ? <p className="mb-3 text-xs">Maya is the freelancer who gets paid. Her workspace is where Chaser chases her late invoices.</p> : null}
-            <p className="font-semibold">Preview: sign-in is turned off in the public demo</p>
-            <p className="mt-1">So you can look around without an account, this demo skips sign-in. A real Chaser workspace sits behind this screen: the owner&apos;s password, then a one-time code emailed to the owner, with email verification and password reset. Only one owner account can exist.</p>
-            <Link href="/" className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">Back to the demo <ArrowRight className="size-4" aria-hidden="true" /></Link>
+            {demoDisplay ? <p className="mb-2">Maya is the freelancer who gets paid. Her workspace is where Chaser chases her late invoices.</p> : null}
+            <p>Sign-in is switched off in this public demo. A real workspace needs the owner&apos;s password and a one-time code sent by email.</p>
+            {demoDisplay ? null : <Link href="/" className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">Back to the demo <ArrowRight className="size-4" aria-hidden="true" /></Link>}
           </div> : null}
           {!authConfigured ? <div role="status" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">Authentication is not enabled yet. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM` in the server environment.</div> : null}
           {testingSender ? <div role="note" className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-950">Resend is using its testing sender. Email delivery is restricted to the eligible Resend test recipient; arbitrary-user delivery is not enabled.</div> : null}
@@ -155,7 +154,7 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
           {step === "password" && error ? <p role="alert" className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">{error}</p> : null}
           {step === "password" && verificationPending ? <button type="button" disabled={busy || !email} onClick={() => void resendVerification()} className="mt-3 w-full rounded-xl border px-4 py-2.5 text-sm font-medium hover:bg-secondary disabled:opacity-60">{busy ? "Requesting…" : "Resend verification email"}</button> : null}
           {notice && step === "password" ? <p role="status" className="mt-4 text-sm text-emerald-700">{notice}</p> : null}
-          <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">Passwords must be at least 14 characters. Email verification and a one-time code are required. No public demo password is enabled.</p>
+          {previewOnly ? null : <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">Passwords must be at least 14 characters. Email verification and a one-time code are required.</p>}
         </div>
       </section>
     </main>

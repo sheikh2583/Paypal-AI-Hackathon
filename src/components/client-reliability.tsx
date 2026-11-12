@@ -55,7 +55,7 @@ export function ClientReliabilityView({ results, publicDemo }: {
     <div>
       <PageHeader title="Client reliability" description="See how clients pay across this workspace’s invoices and installment plans." />
       <p className="mb-5 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-        Private to you. Based only on this account&apos;s invoices. Small demo sample. This score never changes the limits the agent must follow.
+        Private to you and based only on your own invoices. This score never changes the limits the agent must follow.
         {publicDemo ? " The public demo shows fictional clients." : ""}
       </p>
       {results.length === 0 ? (

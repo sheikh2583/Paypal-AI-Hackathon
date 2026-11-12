@@ -69,9 +69,9 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
             <p className="text-sm text-muted-foreground">
               {status.enabled
                 ? status.scheduleConfigured
-                  ? `On. Every ${status.intervalMinutes} minutes Chaser follows up on due invoices by itself, inside your limits.`
+                  ? `Every ${status.intervalMinutes} minutes Chaser follows up on due invoices by itself, inside your limits.`
                   : "On, but scheduled checks aren’t set up here. Follow-ups run when you click below."
-                : "Off. Chaser only acts when you click. Turn it on to let Chaser follow up by itself."}
+                : "Chaser only acts when you click. Turn it on to let Chaser follow up by itself."}
             </p>
           </div>
         </div>

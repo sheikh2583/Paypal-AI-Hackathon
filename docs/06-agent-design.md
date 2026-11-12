@@ -122,7 +122,7 @@ After four agent reminders with no client reply, escalate to the owner using kin
 ## Risk service, next action and follow-ups
 
 - `refreshRisk(invoiceId)` in `src/lib/risk/service.ts`: gathers features (days overdue, amount, client history, responsiveness, `unansweredNudges` = agent messages since the last client message, partial payment), calls `computeRisk`, stores `risk_score` and `risk_factors`, and writes a 1–2 sentence `risk_explanation` from the LLM (cached; regenerate only if null or the score moved by ≥ 5; scripted mode uses a template built from the factors). Call it from the seed, after any message insert, after any payment, and on advance-time.
-- `nextAction(invoice, plan, approvals, now)` in `src/lib/agent/next-action.ts` is pure and returns the dashboard label: "Send first reminder", "Waiting for client reply", "Follow up on <date>", "Needs your approval", "Plan active — next installment due <date>", "Paid".
+- `nextAction(invoice, plan, approvals, now)` in `src/lib/agent/next-action.ts` is pure and returns the dashboard label: "Send first reminder", "Waiting for client reply", "Follow up on <Mon D>", "Answer in Approvals", "Next installment due <Mon D>", "Paid" (dates in UTC, so they match the invoice page).
 - `schedule_followup` sets `next_followup_at`. `POST /api/agent/run-due` runs the agent for every invoice whose follow-up is due; the dashboard has a "Run all due" button and the demo drawer can trigger it after advancing time.
 
 ## Prompt-injection evals (must pass)

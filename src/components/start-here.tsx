@@ -47,7 +47,7 @@ export function StartHere({ ownerFirstName, outstandingLabel, clientCount, maxDi
         />
       </div>
       <p className="mt-4 text-sm text-muted-foreground">
-        Afterwards, the <Link href="/audit" className="font-medium text-primary underline">Audit log</Link> shows every step Chaser took and why, and <Link href="/clients" className="font-medium text-primary underline">Client reliability</Link> ranks who pays on time.
+        Afterwards, the <Link href="/audit" className="font-medium text-primary underline">Audit log</Link> shows every step Chaser took and why, and <Link href="/clients" className="font-medium text-primary underline">Client reliability</Link> ranks who pays on time. To see the other side, <Link href="/client/login" className="font-medium text-primary underline">open Dana’s client portal</Link>.
       </p>
       <details className="group mt-4 rounded-xl border bg-background/60 px-4 py-3">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">

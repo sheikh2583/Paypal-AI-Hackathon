@@ -10,7 +10,7 @@ Every shot below was checked on Nov 12, 2026; recheck the labels on the hosted s
 |---|---|---|
 | 0:00–0:12 | Dashboard: the **Start here** panel, then **Outstanding $5,500.00** | “I’ll pay you Friday. Friday never came. Maya is a freelancer with five overdue invoices, and chasing them is the worst part of her week.” |
 | 0:12–0:25 | Sidebar **PayPal Sandbox** badge, then the **Your limits** card | “Chaser chases them for her. It’s wired to PayPal Invoicing, Sandbox test money here, and it works inside rules she sets once.” |
-| 0:25–0:40 | **Policy** page | “At least 30% up front, no more than three payments, never more than 5% off. These rules live in code. The AI can suggest a plan, but the code decides.” |
+| 0:25–0:40 | **Your limits** page | “At least 30% up front, no more than three payments, never more than 5% off. These rules live in code. The AI can suggest a plan, but the code decides.” |
 | 0:40–0:58 | Click **Start Dana’s story**, then **Start with a reminder** | “Dana owes $900 and is 23 days late. Chaser sends a friendly reminder in Maya’s tone.” |
 | 0:58–1:15 | Click **Continue to Dana’s reply** | “Dana asks to split it. Chaser, writing live with Gemini, offers a plan inside Maya’s limits: here, a deposit now and two payments later.” Read the amounts off the screen; in live mode they can differ from the scripted $270 / $315 / $315. |
 | 1:15–1:35 | Click **Confirm plan and create invoices**. **Payment plan** shows Active and **Sum of installments = original invoice** | “She says yes, and Chaser creates three real PayPal invoices. They add up to exactly $900.” |
@@ -37,7 +37,7 @@ Voiceover: “With a live model, a client can write anything. Chaser treats it a
 ## Shot list
 
 1. Dashboard with $5,500 outstanding and the PayPal Sandbox badge.
-2. Policy page.
+2. Your limits page.
 3. Dana walkthrough, then her payment plan with the three PayPal installment IDs.
 4. Deposit’s PayPal panel.
 5. Priya’s request and the Approvals page.

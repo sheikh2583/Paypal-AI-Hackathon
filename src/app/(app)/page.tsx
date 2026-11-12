@@ -52,7 +52,7 @@ export default async function DashboardPage() {
     <div className="space-y-7">
       <PageHeader
         title={policy?.ownerName ? `Welcome, ${ownerFirstName}` : "Collections dashboard"}
-        description="Your overdue invoices and payment plans. Chaser only acts inside the limits you set."
+        description="Your overdue invoices and payment plans."
       />
 
       {demo ? <StartHere
@@ -67,9 +67,9 @@ export default async function DashboardPage() {
       /> : null}
 
       <section aria-label="Portfolio summary" className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard icon={CircleDollarSign} label="Outstanding" value={money(total)} detail={`${openInvoices.length} open ${openInvoices.length === 1 ? "invoice" : "invoices"}`} />
+        <SummaryCard icon={CircleDollarSign} label="Outstanding" value={money(total)} detail={`owed by ${clientCount} ${clientCount === 1 ? "client" : "clients"}`} />
         <SummaryCard icon={Clock3} label="Waiting on you" value={String(pending.length)} detail={pending.length === 0 ? "Nothing needs your decision" : <Link href="/approvals" className="font-medium text-primary underline">Open Approvals</Link>} />
-        <SummaryCard icon={ShieldCheck} label="Your limits" value={policy ? "Enforced" : "Unavailable"} detail={policy ? `At least ${policy.minDepositPercent}% up front · up to ${policy.maxInstallments} payments · at most ${policy.maxDiscountPercent}% off` : "Owner policy is missing"} />
+        <SummaryCard icon={ShieldCheck} label="Your limits" value={policy ? "Enforced" : "Unavailable"} detail={policy ? `At least ${policy.minDepositPercent}% up front · up to ${policy.maxInstallments} payments · at most ${policy.maxDiscountPercent}% off` : "Your limits are missing"} />
       </section>
 
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">

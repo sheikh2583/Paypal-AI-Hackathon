@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, LayoutDashboard, LoaderCircle, LockKeyhole, LogOut, ScrollText, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Inbox, LayoutDashboard, LoaderCircle, LogOut, ScrollText, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
@@ -19,7 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, alsoActiveFor: ["/invoices"] },
   { href: "/clients", label: "Client reliability", icon: Users },
   { href: "/approvals", label: "Approvals", icon: Inbox },
-  { href: "/policy", label: "Policy", icon: SlidersHorizontal },
+  { href: "/policy", label: "Your limits", icon: SlidersHorizontal },
   { href: "/audit", label: "Audit log", icon: ScrollText },
 ];
 
@@ -30,7 +30,7 @@ function isActive(pathname: string, item: NavItem): boolean {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export function AppNav({ demoPublic }: { demoPublic: boolean }) {
+export function AppNav({ demoPublic, account }: { demoPublic: boolean; account?: { name: string; business: string } }) {
   const pathname = usePathname();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -73,18 +73,16 @@ export function AppNav({ demoPublic }: { demoPublic: boolean }) {
           </Link>
         );
       })}
-      {demoPublic ? <div className="hidden rounded-lg border border-dashed px-3 py-2.5 text-xs leading-relaxed text-muted-foreground md:mt-4 md:block">
-        <p className="flex items-center gap-1.5 font-semibold text-foreground"><LockKeyhole className="size-3.5" aria-hidden="true" /> Public demo</p>
-        <p className="mt-1">No sign-in here, so there is nothing to sign out of. A real workspace is owner-only.</p>
-        <Link href="/login" className="mt-1.5 inline-block font-semibold text-primary hover:underline">See the owner sign-in</Link>
-        <p className="mt-2">Clients have real accounts and see only their own invoices.</p>
-        <Link href="/client/login" className="mt-1 inline-block font-semibold text-primary hover:underline">Client portal sign-in</Link>
-      </div> : null}
-      {demoPublic ? <Link href="/login" className="flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground md:hidden"><LockKeyhole className="size-4" aria-hidden="true" /> Owner sign-in</Link> : null}
-      {!demoPublic ? <button type="button" onClick={() => void signOut()} disabled={busy} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60 md:mt-4 md:border-t md:pt-5">
-        {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
-        {busy ? "Signing out…" : "Sign out"}
-      </button> : null}
+      <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0 md:mt-4 md:flex-col md:items-stretch md:border-t md:pt-4">
+        {account ? <p className="hidden px-3 text-xs leading-snug md:block"><span className="block font-semibold text-foreground">{account.name}</span><span className="text-muted-foreground">{account.business}</span></p> : null}
+        {demoPublic
+          // The public demo has no session to end, so Sign out shows the owner sign-in screen instead.
+          ? <Link href="/login" className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"><LogOut className="size-4" aria-hidden="true" /> Sign out</Link>
+          : <button type="button" onClick={() => void signOut()} disabled={busy} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60">
+            {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
+            {busy ? "Signing out…" : "Sign out"}
+          </button>}
+      </div>
       {error ? <span role="alert" className="basis-full px-3 text-xs text-destructive md:basis-auto">{error}</span> : null}
     </nav>
   );

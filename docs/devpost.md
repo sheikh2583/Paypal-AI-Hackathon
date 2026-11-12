@@ -38,9 +38,9 @@ Live free-text replies work with a configured provider; next is a tuned model an
 
 ## Test the demo
 
-Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal. The hosted demo skips sign-in so you can look around; the owner sign-in a real workspace uses (password, a one-time code emailed to the owner, email verification and password reset) is shown read-only from **See the owner sign-in** in the sidebar.
+Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal. The hosted demo skips sign-in so you can look around; the owner sign-in a real workspace uses (password, a one-time code emailed to the owner, email verification and password reset) is shown read-only from **Sign out** in the sidebar.
 
-**Client portal.** Clients have real accounts. Open **Client portal sign-in** in the sidebar (or `/client/login`) and click **Click for demo**, which signs you in as Dana with a public demo account. You see only Dana’s invoices, her payment plan and PayPal pay links, and you can reply to Chaser as her; another client’s invoice is not reachable.
+**Client portal.** Clients have real accounts. Open **Dana’s client portal** from the Start here card (or `/client/login`) and click **Click for demo**, which signs you in as Dana with a public demo account. You see only Dana’s invoices, her payment plan and PayPal pay links, and you can reply to Chaser as her; another client’s invoice is not reachable.
 
 1. Start on the dashboard. The **Start here** panel explains the demo and offers two stories. A reset workspace shows **Outstanding $5,500.00** and **5 open invoices**, with the **PayPal Sandbox** badge in the sidebar.
 2. Click **Start Dana’s story**. On Dana’s page, click **Start with a reminder**.
