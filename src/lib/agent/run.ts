@@ -184,7 +184,9 @@ export function isAgentRunInProgress(invoiceId: string): boolean {
 function oneSentence(text: string, outcome: RunOutcome): string {
   const cleaned = text.trim().replace(/\s+/g, ' ');
   const firstSentence = cleaned.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
-  if (firstSentence && !exposesAgentInstructions(cleaned)) return firstSentence;
+  // The loop's own cap notice says nothing about what the run achieved, so the outcome sentence replaces it.
+  const capNotice = /^Tool iteration limit reached\.?$/i.test(cleaned);
+  if (firstSentence && !capNotice && !exposesAgentInstructions(cleaned)) return firstSentence;
   const fallback: Record<RunOutcome, string> = {
     NUDGED: 'Sent a reminder about the overdue invoice.',
     PLAN_OFFERED: 'Prepared a payment plan within the owner policy.',
@@ -197,6 +199,14 @@ function oneSentence(text: string, outcome: RunOutcome): string {
 }
 
 function outcomeFor(toolCalls: ToolCallRecord[]): RunOutcome {
+  const last = lastOutcome(toolCalls);
+  // Issuing the installments is the run's real result; a confirmation or follow-up after it does not change that.
+  const issued = toolCalls.some((call) => call.tool === 'create_plan_invoices' && call.ok
+    && typeof call.result === 'object' && call.result !== null && (call.result as Record<string, unknown>).ok === true);
+  return issued && (last === 'WAITING' || last === 'NUDGED') ? 'PLAN_ACTIVE' : last;
+}
+
+function lastOutcome(toolCalls: ToolCallRecord[]): RunOutcome {
   for (const call of [...toolCalls].reverse()) {
     if (!call.ok || !call.result || typeof call.result !== 'object') continue;
     const result = call.result as Record<string, unknown>;

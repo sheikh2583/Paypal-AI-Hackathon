@@ -668,7 +668,14 @@ async function handleCreatePlanInvoices(
   audit({ actor: 'agent', action: 'create_plan_invoices', invoiceId: invoice.id, input, result: { ok: true, installmentsCreated: installmentInvoices.length }, ok: true }, database);
   emit({ type: 'invoice.updated', invoiceId: invoice.id, at: now.toISOString() });
 
-  return JSON.stringify({ ok: true, installmentsCreated: installmentInvoices.length, planId: plan.id });
+  // The real pay links go back to the model so its confirmation can quote them instead of inventing one
+  // (the send_message allowlist rejects any link that is not one of these).
+  return JSON.stringify({
+    ok: true,
+    installmentsCreated: installmentInvoices.length,
+    planId: plan.id,
+    installments: installmentInvoices.map((ii) => ({ installmentNo: ii.no, amountCents: ii.amountCents, dueAt: ii.dueAt, payUrl: ii.paypalUrl })),
+  });
 }
 
 async function handleEscalateToOwner(
