@@ -118,5 +118,5 @@ export function parseRateLimit(body: string, headers: Headers): RateLimitInfo {
 export function scrubSecrets(text: string, keys: readonly string[]): string {
   let scrubbed = text;
   for (const [index, key] of keys.entries()) if (key) scrubbed = scrubbed.split(key).join(`[key #${index + 1}]`);
-  return scrubbed.replace(/AIza[0-9A-Za-z_-]{10,}/g, "[redacted]").replace(/([?&]key=)[^&\s"']+/gi, "$1[redacted]");
+  return scrubbed.replace(/AIza[0-9A-Za-z_-]{10,}|AQ\.[0-9A-Za-z_.-]{20,}/g, "[redacted]").replace(/([?&]key=)[^&\s"']+/gi, "$1[redacted]");
 }

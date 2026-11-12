@@ -9,7 +9,7 @@ const emailPattern = /\b([A-Z0-9._%+-])[A-Z0-9._%+-]*@([A-Z0-9.-]+\.[A-Z]{2,})\b
 
 function redactText(value: string): string {
   // Google API keys can appear in provider error text; never let one reach the log.
-  return value.replace(emailPattern, "$1***@$2").replace(/AIza[0-9A-Za-z_-]{10,}/g, "[redacted]");
+  return value.replace(emailPattern, "$1***@$2").replace(/AIza[0-9A-Za-z_-]{10,}|AQ\.[0-9A-Za-z_.-]{20,}/g, "[redacted]");
 }
 
 function redactValue(value: unknown, seen: WeakSet<object>): unknown {

@@ -190,4 +190,9 @@ describe('pool helpers', () => {
     expect(scrubbed).toContain('[key #2]');
     expect(scrubbed).not.toContain('AIzaSomeOther');
   });
+
+  it('also scrubs keys in the newer AQ. format, and leaves ordinary words alone', () => {
+    const scrubbed = scrubSecrets('rejected AQ.Ab8TESTnotARealKey0000000000000000 for AQUARIUM_PROJECT_NAME_LONGER_THAN_20', []);
+    expect(scrubbed).toBe('rejected [redacted] for AQUARIUM_PROJECT_NAME_LONGER_THAN_20');
+  });
 });
