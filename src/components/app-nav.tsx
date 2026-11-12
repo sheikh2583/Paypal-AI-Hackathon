@@ -77,6 +77,8 @@ export function AppNav({ demoPublic }: { demoPublic: boolean }) {
         <p className="flex items-center gap-1.5 font-semibold text-foreground"><LockKeyhole className="size-3.5" aria-hidden="true" /> Public demo</p>
         <p className="mt-1">No sign-in here, so there is nothing to sign out of. A real workspace is owner-only.</p>
         <Link href="/login" className="mt-1.5 inline-block font-semibold text-primary hover:underline">See the owner sign-in</Link>
+        <p className="mt-2">Clients have real accounts and see only their own invoices.</p>
+        <Link href="/client/login" className="mt-1 inline-block font-semibold text-primary hover:underline">Client portal sign-in</Link>
       </div> : null}
       {demoPublic ? <Link href="/login" className="flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground md:hidden"><LockKeyhole className="size-4" aria-hidden="true" /> Owner sign-in</Link> : null}
       {!demoPublic ? <button type="button" onClick={() => void signOut()} disabled={busy} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60 md:mt-4 md:border-t md:pt-5">

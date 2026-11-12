@@ -199,6 +199,17 @@ export const mockPaypalInvoices = sqliteTable(
   (table) => [uniqueIndex("mock_paypal_invoices_number_idx").on(table.number)],
 );
 
+/**
+ * Links a client sign-in (a Better Auth user, by email) to the client it may see (D77).
+ * Not part of the demo seed, so a demo reset keeps client logins. No foreign key: a reset
+ * re-inserts clients with the same IDs.
+ */
+export const clientAccounts = sqliteTable("client_accounts", {
+  email: text("email").primaryKey(),
+  clientId: text("client_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const kv = sqliteTable("kv", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
@@ -220,6 +231,7 @@ export const schema = {
   auditLog,
   webhookEvents,
   mockPaypalInvoices,
+  clientAccounts,
   kv,
   authEmailVerificationTokens,
 };

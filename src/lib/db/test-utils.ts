@@ -54,6 +54,7 @@ export function createTestDb(database = openDb(":memory:")): AppDb {
       recipient_view_url text NOT NULL, created_at text NOT NULL
     );
     CREATE TABLE kv (key text PRIMARY KEY, value text NOT NULL);
+    CREATE TABLE client_accounts (email text PRIMARY KEY, client_id text NOT NULL, created_at text NOT NULL);
   `);
   return database;
 }

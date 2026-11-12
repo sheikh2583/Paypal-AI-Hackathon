@@ -15,7 +15,8 @@
     "db:seed": "tsx --env-file-if-exists=.env.local src/lib/db/seed.ts",
     "db:seed-if-empty": "tsx --env-file-if-exists=.env.local scripts/seed-if-empty.ts",
     "auth:migrate": "tsx --env-file-if-exists=.env.local scripts/auth-migrate.ts",
-    "paypal:smoke": "tsx --env-file-if-exists=.env.local src/lib/paypal/smoke.ts"
+    "paypal:smoke": "tsx --env-file-if-exists=.env.local src/lib/paypal/smoke.ts",
+    "clients:accounts": "tsx --env-file-if-exists=.env.local scripts/client-accounts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

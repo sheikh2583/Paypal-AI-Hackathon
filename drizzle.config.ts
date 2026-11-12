@@ -33,6 +33,7 @@ export default defineConfig({
     "webhook_events",
     "mock_paypal_invoices",
     "kv",
+    "client_accounts",
     "auth_email_verification_tokens",
   ],
   out: "./drizzle",

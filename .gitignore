@@ -32,3 +32,6 @@ yarn-error.log*
 # Local handoff files
 /claude_handoff.md
 /claude-minimal-share.zip
+
+# client account passwords written by pnpm clients:accounts
+client-accounts.local.md

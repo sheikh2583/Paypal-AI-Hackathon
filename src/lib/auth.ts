@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db/client";
 import { getAppEnv, getAuthEnv } from "@/lib/env";
 import { sendAuthEmail } from "@/lib/auth-email";
+import { countOwnerUsers } from "@/lib/owner-count";
 import { ensureAuthTokenSchema, ensureRateLimitIdColumn, hashEmailOtp, resetPasswordIdentifier, storeEmailVerificationToken } from "@/lib/auth-tokens";
 
 const settings = getAuthEnv();
@@ -169,8 +170,7 @@ export function getAuthReadiness(): { ready: boolean; missing: string[]; testing
 
 export async function getOwnerAccountExists(): Promise<boolean> {
   await ensureAuthSchema();
-  const row = db.$client.prepare('SELECT COUNT(*) AS count FROM "user"').get() as { count: number };
-  return row.count > 0;
+  return countOwnerUsers(db.$client, settings.ownerEmail) > 0;
 }
 
 export async function getDemoSession() {
