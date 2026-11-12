@@ -1,8 +1,62 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createLiveLLM, OpenAICompatibleLLM } from './llm';
+import { createLiveLLM, OpenAICompatibleLLM, parseResetDuration, rateLimitWaitMs, supportsEffort } from './llm';
 
 vi.mock('./clock', () => ({ getNow: () => new Date('2026-11-10T00:00:00.000Z') }));
+
+const anthropicCalls = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = {
+      create: async (params: Record<string, unknown>) => { anthropicCalls.push(params); return { stop_reason: 'end_turn', content: [{ type: 'text', text: 'done' }] }; },
+      parse: async (params: Record<string, unknown>) => { anthropicCalls.push(params); return { parsed_output: { ok: true } }; },
+    };
+  },
+}));
+
+const anthropicEnv = (model: string) => ({ provider: 'anthropic' as const, apiKey: 'test-secret-123', model, baseUrl: undefined, maxHistory: 20, configuredMode: 'live' as const, mode: 'live' as const });
+
+describe('AnthropicLLM request shape', () => {
+  afterEach(() => { anthropicCalls.length = 0; });
+
+  it('never forces tool_choice, asks for the required tool in the prompt and keeps effort low on current models', async () => {
+    const llm = createLiveLLM(anthropicEnv('claude-sonnet-5-5'));
+    await llm.runToolLoop({ system: 'base prompt', messages: [{ role: 'user', content: 'go' }], tools: [{ name: 'lookup', description: 'lookup', inputSchema: { type: 'object' } }], maxIterations: 1, toolChoiceName: 'lookup', onToolCall: async () => '{}' });
+    const [params] = anthropicCalls;
+    expect(params.tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: true });
+    expect(String(params.system)).toContain('Call the lookup tool now');
+    expect(params.max_tokens).toBe(4096);
+    expect(params.output_config).toEqual({ effort: 'low' });
+  });
+
+  it('omits effort on models that reject it and passes the structured output format', async () => {
+    const llm = createLiveLLM(anthropicEnv('claude-haiku-4-5'));
+    await llm.runToolLoop({ system: 's', messages: [{ role: 'user', content: 'go' }], tools: [], maxIterations: 1, onToolCall: async () => '{}' });
+    expect(anthropicCalls[0]).not.toHaveProperty('output_config');
+    expect(anthropicCalls[0].tool_choice).toEqual({ type: 'auto', disable_parallel_tool_use: false });
+    await expect(createLiveLLM(anthropicEnv('claude-opus-5-5')).structured({ system: 'classify', input: 'hi', schema: z.object({ ok: z.boolean() }) })).resolves.toEqual({ ok: true });
+    const parseParams = anthropicCalls[1].output_config as { format: unknown; effort?: string };
+    expect(parseParams.format).toBeTruthy();
+    expect(parseParams.effort).toBe('low');
+  });
+});
+
+describe('rate-limit helpers', () => {
+  it('recognises the current Claude families for effort', () => {
+    expect(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-fable-5-1'].every(supportsEffort)).toBe(true);
+    expect(['claude-haiku-4-5', 'claude-sonnet-4-5', 'gpt-oss-20b'].some(supportsEffort)).toBe(false);
+  });
+
+  it('parses provider reset hints and bounds the wait', () => {
+    expect(parseResetDuration('12')).toBe(12_000);
+    expect(parseResetDuration('10.057s')).toBeCloseTo(10_057);
+    expect(parseResetDuration('2m59.56s')).toBeCloseTo(179_560);
+    expect(parseResetDuration('garbage')).toBeNull();
+    expect(rateLimitWaitMs(new Headers({ 'x-ratelimit-reset-tokens': '3s' }))).toBe(3_250);
+    expect(rateLimitWaitMs(new Headers({ 'retry-after': '120' }))).toBe(15_000);
+    expect(rateLimitWaitMs(new Headers())).toBe(350);
+  });
+});
 
 const url = 'https://provider.test/v1';
 const key = 'test-secret-123';

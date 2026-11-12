@@ -75,11 +75,9 @@ export class OpenAICompatibleLLM implements LLM {
           const error = new LlmRequestError(`LLM_HTTP_${response.status}`, response.status);
           if (attempt === 0 && retryableStatus(response.status)) {
             last = error;
-            // Honour the provider's retry-after (seconds) on 429. Each attempt has its own timeout,
-            // so the wait is bounded separately to keep a UI request under about half a minute.
-            const retryAfter = Number(response.headers.get('retry-after'));
-            const waitMs = response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 15_000) : 350;
-            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            // Honour the provider's retry-after or rate-limit reset on 429. Each attempt has its own
+            // timeout, so the wait is bounded separately to keep a UI request under about half a minute.
+            await new Promise((resolve) => setTimeout(resolve, response.status === 429 ? rateLimitWaitMs(response.headers) : 350));
             continue;
           }
           throw error;
@@ -148,6 +146,27 @@ export class LlmRequestError extends Error {
   constructor(public readonly code: string, public readonly status?: number) { super(code); this.name = 'LlmRequestError'; }
 }
 function retryableStatus(status: number): boolean { return status === 429 || status >= 500; }
+
+const MAX_RATE_LIMIT_WAIT_MS = 15_000;
+/** Parses "12", "10.5s", "2m59.56s" or "1h2m" style durations into milliseconds. */
+export function parseResetDuration(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed) * 1000;
+  let total = 0;
+  let matched = false;
+  for (const [, amount, unit] of trimmed.matchAll(/(\d+(?:\.\d+)?)(ms|h|m|s)/g)) {
+    matched = true;
+    total += Number(amount) * (unit === 'h' ? 3_600_000 : unit === 'm' ? 60_000 : unit === 's' ? 1000 : 1);
+  }
+  return matched ? total : null;
+}
+/** Wait suggested by a 429 response, bounded so a UI request still finishes promptly. */
+export function rateLimitWaitMs(headers: Headers): number {
+  const hints = [headers.get('retry-after'), headers.get('x-ratelimit-reset-tokens'), headers.get('x-ratelimit-reset-requests')]
+    .map(parseResetDuration).filter((ms): ms is number => ms !== null && ms > 0);
+  return hints.length ? Math.min(Math.max(...hints) + 250, MAX_RATE_LIMIT_WAIT_MS) : 350;
+}
 export function isRetryableLlmError(error: unknown): boolean {
   if (error instanceof LlmRequestError) return error.code === 'LLM_TIMEOUT' || error.code === 'LLM_NETWORK_ERROR' || error.status === 429 || (error.status ?? 0) >= 500;
   const status = typeof error === 'object' && error !== null ? Number((error as { status?: unknown }).status) : 0;
@@ -162,6 +181,14 @@ function zodJsonSchema(schema: import('zod').ZodType): unknown {
 // AnthropicLLM — live implementation
 // ---------------------------------------------------------------------------
 
+// Per-call budget. Current Claude models think before answering, so 10 s was too tight; the agent
+// run still enforces its own 60 s overall timeout.
+const ANTHROPIC_CALL_TIMEOUT_MS = 25_000;
+// Effort is accepted by the Claude 4.6+ and 5.x families; older models reject the field.
+export function supportsEffort(model: string): boolean {
+  return /^claude-(fable|mythos|opus|sonnet|haiku)-(5|4-[6-9])(-|$)/.test(model);
+}
+
 class AnthropicLLM implements LLM {
   private readonly apiKey: string;
   private readonly model: string;
@@ -173,15 +200,20 @@ class AnthropicLLM implements LLM {
 
   private async createClient() {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    // Never log apiKey (hard rule 4).
-    return new Anthropic({ apiKey: this.apiKey });
+    // Never log apiKey (hard rule 4). The SDK retries 429/5xx once with backoff; callWithRetry adds one more.
+    return new Anthropic({ apiKey: this.apiKey, timeout: ANTHROPIC_CALL_TIMEOUT_MS, maxRetries: 1 });
+  }
+
+  /** Keep answers short and fast: collections replies are a few sentences plus tool calls. */
+  private outputConfig() {
+    return supportsEffort(this.model) ? { output_config: { effort: 'low' as const } } : {};
   }
 
   private async callWithRetry<T>(fn: (signal: AbortSignal) => Promise<T>, outerSignal?: AbortSignal): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (outerSignal?.aborted) throw outerSignal.reason ?? new Error('LLM call aborted');
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
+      const timeout = setTimeout(() => controller.abort(), ANTHROPIC_CALL_TIMEOUT_MS);
       try {
         return await fn(outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal);
       } catch (err: unknown) {
@@ -209,6 +241,11 @@ class AnthropicLLM implements LLM {
 
     let summary = '';
     let iterations = 0;
+    // Current Claude models reject a forced tool_choice, so a required tool is requested in the
+    // prompt and the loop stays on `auto` with parallel calls disabled.
+    const system = opts.toolChoiceName
+      ? `${opts.system}\n\nCall the ${opts.toolChoiceName} tool now, before anything else.`
+      : opts.system;
 
     while (iterations < opts.maxIterations) {
       if (opts.signal?.aborted) throw opts.signal.reason ?? new Error('LLM call aborted');
@@ -216,11 +253,12 @@ class AnthropicLLM implements LLM {
         client.messages.create(
           {
             model: this.model,
-            max_tokens: 1024,
-            system: opts.system,
+            max_tokens: 4096,
+            system,
             messages,
             tools: sdkTools,
-            ...(opts.toolChoiceName ? { tool_choice: { type: 'tool' as const, name: opts.toolChoiceName } } : {}),
+            tool_choice: { type: 'auto', disable_parallel_tool_use: Boolean(opts.toolChoiceName) },
+            ...this.outputConfig(),
           },
           { signal },
         ),
@@ -279,10 +317,10 @@ class AnthropicLLM implements LLM {
       client.messages.parse(
         {
           model: this.model,
-          max_tokens: 512,
+          max_tokens: 2048,
           system: opts.system,
           messages: [{ role: 'user', content: opts.input }],
-          output_config: { format: zodOutputFormat(opts.schema) },
+          output_config: { format: zodOutputFormat(opts.schema), ...(supportsEffort(this.model) ? { effort: 'low' as const } : {}) },
         },
         { signal },
       ),

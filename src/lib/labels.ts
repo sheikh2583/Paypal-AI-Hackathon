@@ -185,3 +185,15 @@ export function paypalEventLabel(eventType: string): string {
 export function initials(name: string): string {
   return name.split(" ").map((part) => part[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 }
+
+/** Short, non-secret provider name for the header badge, derived from the configured endpoint. */
+export function llmProviderLabel(env: { provider: "anthropic" | "openai-compatible"; baseUrl?: string; model: string }): string {
+  if (env.provider === "anthropic") return "Claude";
+  let host = "";
+  try { host = new URL(env.baseUrl ?? "").hostname; } catch { host = ""; }
+  if (host.includes("groq")) return "Groq";
+  if (host.includes("googleapis")) return "Gemini";
+  if (host.includes("openrouter")) return "OpenRouter";
+  if (host.endsWith("openai.com")) return "OpenAI";
+  return env.model || "Live model";
+}

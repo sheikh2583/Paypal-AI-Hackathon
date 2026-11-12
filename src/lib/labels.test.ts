@@ -36,3 +36,13 @@ describe("human labels", () => {
     expect(initials("priya")).toBe("P");
   });
 });
+
+describe("llmProviderLabel", () => {
+  it("names the provider without exposing keys or hosts", async () => {
+    const { llmProviderLabel } = await import("./labels");
+    expect(llmProviderLabel({ provider: "anthropic", model: "claude-sonnet-5-5" })).toBe("Claude");
+    expect(llmProviderLabel({ provider: "openai-compatible", baseUrl: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-20b" })).toBe("Groq");
+    expect(llmProviderLabel({ provider: "openai-compatible", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemini-3.5-flash-lite" })).toBe("Gemini");
+    expect(llmProviderLabel({ provider: "openai-compatible", baseUrl: "not a url", model: "local-model" })).toBe("local-model");
+  });
+});

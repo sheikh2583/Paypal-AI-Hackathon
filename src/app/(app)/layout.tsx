@@ -2,13 +2,14 @@ import { AppNav } from "@/components/app-nav";
 import { LiveUpdates } from "@/components/live-updates";
 import { getDemoSession } from "@/lib/auth";
 import { getAppEnv, getLlmEnv, getPayPalEnv } from "@/lib/env";
+import { llmProviderLabel } from "@/lib/labels";
 import { redirect } from "next/navigation";
 import { PayPalModeBadge } from "@/components/paypal-mode-badge";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!(await getDemoSession())) redirect("/login");
   const { demoPublic } = getAppEnv();
-  const { mode } = getLlmEnv();
+  const llm = getLlmEnv();
   const paypal = getPayPalEnv();
   return (
     <div className="min-h-screen md:flex">
@@ -24,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mb-3 px-3 md:mb-6">
           <p className="text-lg font-semibold tracking-tight">Chaser</p>
           <p className="hidden text-xs text-muted-foreground md:block">Invoice collections agent</p>
-          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{mode === "live" ? "Live AI" : "Guided demo"}</p>
+          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{llm.mode === "live" ? `Live AI · ${llmProviderLabel(llm)}` : "Guided demo"}</p>
           <PayPalModeBadge mode={paypal.mode} credentialsConfigured={Boolean(paypal.clientId && paypal.clientSecret)} />
         </div>
         <AppNav demoPublic={demoPublic} />
