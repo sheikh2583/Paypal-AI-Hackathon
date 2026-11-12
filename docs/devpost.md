@@ -10,7 +10,7 @@ Late invoices turn a small business owner's workday into awkward follow-up. I wa
 
 ## What it does
 
-Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client’s reply, and proposes a payment plan inside the owner’s limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox, emailing the owner when a decision is needed. An Autopilot switch lets it sweep due invoices on a schedule. With a live model configured, a judge can reply as the client in free text and watch the agent answer within policy; the guided Dana and Priya steps stay scripted so the walkthrough is repeatable. Client reliability ranks the owner’s clients from their own invoice and payment records and explains each score.
+Chaser ranks overdue fictional invoices, drafts a short follow-up, classifies a client’s reply, and proposes a payment plan inside the owner’s limits. It can create PayPal installment invoices, track payment, and send requests outside policy to an approval inbox. In a private deployment with Resend configured, it emails the owner when a decision is needed. An Autopilot switch lets the owner run a sweep of due invoices on demand, or on a schedule once a cron secret is configured. With a live model configured, a judge can reply as the client in free text and watch the agent answer within policy; if the provider is busy, a scripted fallback answers and the audit log says so. The guided Dana and Priya steps stay scripted so the walkthrough is repeatable. Client reliability ranks the owner’s clients from their own invoice and payment records and explains each score.
 
 ## How I built it
 
@@ -40,14 +40,14 @@ Live free-text replies work with a configured provider; next is a tuned model an
 
 Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal.
 
-1. Start on the dashboard. A reset workspace shows five overdue invoices totaling $5,500.
+1. Start on the dashboard. A reset workspace shows **Outstanding $5,500.00** and **5 open invoices**, with the **PayPal Sandbox** badge in the sidebar.
 2. Open Dana Whitfield’s invoice and click **Start with a reminder**.
 3. Click **Continue to Dana’s reply** to see the scripted split request. Review the $270 deposit and two $315 installments, then click **Confirm plan and create invoices**.
-4. Review the PayPal panel and installment list. Open **Deposit** for the linked invoice’s ID and **Open in PayPal** link. The dashboard’s **PayPal activity** card lists deliveries as they arrive.
-5. Open the PayPal panel on any invoice to see the live Sandbox invoice ID and link, and the PayPal activity card for verified webhook events. Use an issued installment to see a linked Sandbox invoice.
-6. Open **Audit log** to see the tool and policy decisions.
-7. Open Priya’s invoice and click **Simulate Priya’s 40% discount request**. Check **Approvals** for the escalation.
-8. On the dashboard, click **Reset demo** and confirm to restore the fictional workspace.
+4. In **Payment plan**, check that the three installments show **Sum of installments = original invoice**. Each row shows its PayPal Sandbox invoice ID and an **Open in PayPal** link. Open **Deposit** to see its **PayPal** panel. The dashboard’s **PayPal activity** card lists signature-verified webhook events as they arrive.
+5. Open **Audit log** to see the tool calls and policy decisions, with the raw record behind each entry.
+6. Open Priya’s invoice and click **Priya asks for 40% off**. The request is above the 5% cap, so it goes to **Approvals** instead of being decided. There you can click **Send 5% goodwill counter**.
+7. Open **Client reliability** to see the clients ranked by how they pay, with a breakdown for each score.
+8. On the dashboard, click **Reset demo** and confirm to restore the fictional workspace. Resets have a 10-second cooldown.
 
 **Optional: Pay as the buyer before resetting.** Open the deposit’s **Open in PayPal** link. PayPal Sandbox asks for the Personal buyer account `sb-ciade53821110@personal.example.com` and password **[PASTE BUYER PASSWORD]**. This uses test money. On Nov 11, 2026, a hosted Sandbox buyer payment produced an `INVOICING.INVOICE.PAID` webhook that Chaser verified and recorded.
 

@@ -36,7 +36,7 @@ Elena's plan exceeds the auto-approve threshold, so her journey demonstrates the
 
 **1:30–2:10 — PayPal.** In the default mock mode, select “Simulate $270 deposit payment” on Dana's invoice. Show the deposit change to paid and the installment plan remain active. This is a deterministic mock payment, not a real PayPal transaction. If presenting a separately configured Sandbox run, use the PayPal Sandbox invoice page and buyer account instead.
 
-**2:10–2:40 — Safety (Priya).** Open **Approvals**, follow **Open Priya’s demo invoice**, and select **Simulate Priya’s 40% discount request**. Chaser escalates it as `DISCOUNT_REQUEST`. Return to **Approvals** and select **Send 5% goodwill counter**. Chaser relays the owner’s offer, and the decision appears in the audit log.
+**2:10–2:40 — Safety (Priya).** Open **Approvals**, follow **Open Priya’s demo invoice**, and select **Priya asks for 40% off**. Chaser escalates it as `DISCOUNT_REQUEST`. Return to **Approvals** and select **Send 5% goodwill counter**. Chaser relays the owner’s offer, and the decision appears in the audit log.
 
 **2:40–3:00 — Trust.** Open the Audit log: every tool call and policy decision with timestamps. Close with the one-line value prop and "Built with PayPal Invoicing and Claude."
 

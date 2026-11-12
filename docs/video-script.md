@@ -1,44 +1,49 @@
-# Three-minute demo script
+# Demo video script (2:45)
 
-Record the [hosted Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com) in **PayPal Sandbox**. Open it a minute before recording so Render Free can wake, and click **Reset demo** first. Dana’s and Priya’s guided replies are scripted so the walkthrough is repeatable; the free-text reply box uses the live model when a provider is configured. Add a buyer payment shot only after rehearsing it.
+Record the [hosted Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com) in **PayPal Sandbox**. Open it a minute before recording so Render Free can wake, and click **Reset demo** once before you start. Click it once more after recording; resets have a 10-second cooldown.
+
+Every shot below was checked on the hosted site on Nov 12, 2026. Dana’s and Priya’s replies are scripted so the walkthrough is repeatable. Don’t claim owner emails or scheduled Autopilot sweeps in the video: the hosted demo has neither configured.
 
 ## Timed script
 
-**0:00–0:15 — Problem**  
-On screen: dashboard. Voiceover: “Maya has five overdue invoices worth $5,500. Chasing them is awkward and slow. Chaser is the collections agent that does it for her, and it can’t promise anything she hasn’t approved.”
+| Time | On screen | Voiceover |
+|---|---|---|
+| 0:00–0:12 | Dashboard: **Outstanding $5,500.00**, **5 open invoices** | “I’ll pay you Friday. Friday never came. Maya is a freelancer with five overdue invoices, and chasing them is the worst part of her week.” |
+| 0:12–0:25 | Sidebar **PayPal Sandbox** badge, then the **Policy guardrails** card | “Chaser chases them for her. It’s wired to PayPal Invoicing, Sandbox test money here, and it works inside rules she sets once.” |
+| 0:25–0:40 | **Policy** page | “At least 30% up front, no more than three payments, never more than 5% off. These rules live in code. The AI can suggest a plan, but the code decides.” |
+| 0:40–0:58 | Dana’s invoice, click **Start with a reminder** | “Dana owes $900 and is 23 days late. Chaser sends a friendly reminder in Maya’s tone.” |
+| 0:58–1:15 | Click **Continue to Dana’s reply** | “Dana asks to split it. Chaser offers $270 now and two payments of $315, inside Maya’s limits.” |
+| 1:15–1:35 | Click **Confirm plan and create invoices**. **Payment plan** shows Active and **Sum of installments = original invoice** | “She says yes, and Chaser creates three real PayPal invoices. They add up to exactly $900.” |
+| 1:35–1:55 | Open **Deposit**: the **PayPal** panel with the invoice ID and **Open in PayPal** | “Here’s the deposit’s PayPal invoice ID and the link Dana pays from. When PayPal reports a payment, Chaser checks the signature before it believes it.” |
+| 1:55–2:15 | Priya’s invoice, click **Priya asks for 40% off**, then **Approvals** | “Priya wants 40% off. That’s over Maya’s limit, so Chaser doesn’t decide. It brings it to Maya with the reason and a suggested reply.” |
+| 2:15–2:28 | **Client reliability** | “Chaser also ranks clients by how they actually pay, from Maya’s own records, and explains every score.” |
+| 2:28–2:40 | **Audit log** summary tiles, expand one entry | “Every message, decision and PayPal event is written down, so Maya can see exactly why anything happened.” |
+| 2:40–2:45 | Dashboard | “Chaser. It chases the money and never promises what you didn’t approve.” |
 
-**0:15–0:30 — Guardrails**  
-On screen: Policy page. Voiceover: “She sets the limits once: a 30% minimum deposit, at most three installments, a 5% discount cap. These live in code, not in a prompt. The model proposes; the policy engine decides.”
+## Optional clip: buyer payment (about 25 seconds)
 
-**0:30–1:05 — Dana negotiation**  
-On screen: dashboard walkthrough card, click through reminder, reply, plan. Voiceover: “Dana asks to split her $900 invoice. Chaser computes a $270 deposit and two $315 installments, inside the limits, and waits for her yes.”
+Record this as its own take, after the plan step and before any reset. Open the deposit’s **Open in PayPal** link in a private window and pay as the Personal Sandbox buyer. Return to Chaser and show **PayPal activity** listing the paid event and the deposit marked Paid. The status can update through reconciliation before the webhook appears.
 
-**1:05–1:30 — PayPal issues the plan**  
-On screen: confirm plan, open Dana’s invoice, show the three installment invoices and the deposit’s PayPal ID and payer link. Caption: “PayPal Sandbox · test money only.” Voiceover: “The moment she agrees, Chaser creates three real invoices through PayPal Invoicing. Here’s the deposit’s PayPal ID and the payer link. Webhooks come back verified.”
+Voiceover: “Dana pays in PayPal, PayPal tells Chaser, and the invoice updates by itself.”
 
-**1:30–1:55 — Out of policy goes to a human**  
-On screen: Priya’s invoice, click “Priya asks for 40% off”, then Approvals. Voiceover: “Priya wants 40% off. That’s above Maya’s cap, so Chaser escalates instead of deciding. Maya gets an email, and the approval inbox shows the reason and a recommendation.”
+If you use this clip, cut the Client reliability shot to stay under 2:45.
 
-**1:55–2:20 — Live AI, free text**  
-If live AI is on: on screen, Marcus’s invoice, type “Can I get 20% off if I pay today?” in Reply as Marcus. Voiceover: “With a live model, a client can say anything. Chaser treats it as untrusted text, answers in Maya’s tone, and still can’t exceed the cap.”  
-If scripted: on screen, Client reliability. Voiceover: “Chaser also ranks clients by how they actually pay, from this account’s own records, with the reasons spelled out.”
+## Optional clip: live AI reply
 
-**2:20–2:45 — Autopilot and the audit log**  
-On screen: dashboard Autopilot card, switch it on, click “Run a sweep now”; then Audit log. Voiceover: “Switch on Autopilot and Chaser sweeps due invoices every thirty minutes. Every tool call, every policy decision and every PayPal event lands in the audit log in plain language, with the raw record one click away.”
+Only if a live reply has been checked on the hosted site that day. On Marcus’s invoice, type “Could you take 20% off if I pay today?” and click **Send as Marcus**. Use it only if the activity shows a live answer, not the scripted fallback note.
 
-**2:45–3:00 — Architecture and close**  
-On screen: the slide below. Voiceover: “Client text in, model proposes, Zod validates, policy decides, then PayPal acts and the audit log records it. Built with PayPal Invoicing, Render, Turso and Resend. Chaser: collections that never overstep.”
+Voiceover: “With a live model, a client can write anything. Chaser treats it as untrusted text and still can’t go past the 5% cap.”
 
 ## Shot list
 
-1. Dashboard with five overdue invoices and the Autopilot card.
+1. Dashboard with $5,500 outstanding and the PayPal Sandbox badge.
 2. Policy page.
-3. Dana walkthrough, then her invoice with the three PayPal installment IDs.
-4. Priya’s request and the Approvals page (email mention).
-5. Reply-as-client box on Marcus (live) or Client reliability (scripted).
-6. Audit log with the summary tiles.
-7. Architecture slide, final fifteen seconds.
+3. Dana walkthrough, then her payment plan with the three PayPal installment IDs.
+4. Deposit’s PayPal panel.
+5. Priya’s request and the Approvals page.
+6. Client reliability.
+7. Audit log with the summary tiles.
 
 ## Architecture slide
 
-Five boxes: **Client text (untrusted)** → **LLM proposes** → **Zod validates** → **Policy decides** → **PayPal acts + audit**. Below: **PayPal Sandbox**, **Turso**, **Resend**, **Render**. Caption: “The model proposes; deterministic code decides.”
+Five boxes: **Client text (untrusted)** → **LLM proposes** → **Zod validates** → **Policy decides** → **PayPal acts + audit**. Below: **PayPal Sandbox**, **Turso**, **Render**. Caption: “The model proposes; deterministic code decides.”
