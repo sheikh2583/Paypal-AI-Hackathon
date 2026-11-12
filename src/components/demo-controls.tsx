@@ -20,6 +20,11 @@ interface DemoControlsProps {
   paymentComplete?: boolean;
   planComplete?: boolean;
   showPlanLink?: boolean;
+  /** Card heading and one-line explanation for a guided story. */
+  title?: string;
+  description?: string;
+  /** Where the visitor should look after a step, shown with the step's result. */
+  resultLink?: { href: string; label: string };
 }
 
 const demoSteps = ["Send reminder", "Hear Dana’s reply", "Agree and issue plan"];
@@ -28,7 +33,7 @@ const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "curren
 export function DemoControls({
   invoiceId, priyaAction, paymentInvoiceId, paypalMode, showTimeControls = false, showReset = false,
   compact = false, stepComplete = false, progressStep = 0, paymentAmountCents, depositPayment = false, paymentComplete = false,
-  planComplete = false, showPlanLink = false,
+  planComplete = false, showPlanLink = false, title, description, resultLink,
 }: DemoControlsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -45,7 +50,7 @@ export function DemoControls({
       const result = await response.json() as { error?: { message?: string }; run?: { summary?: string }; reply?: string; message?: string; status?: string; reset?: boolean };
       if (!response.ok) throw new Error(result.error?.message ?? "The demo action failed.");
       const runSummary = result.run?.summary;
-      const detail = runSummary ? `${result.reply ? `${priyaAction ? "Priya" : "Dana"}: “${result.reply}” ` : ""}${runSummary}` : result.message ?? (result.status ? `Payment recorded. The invoice is now ${result.status.toLowerCase().replaceAll("_", " ")}.` :result.reply ? `Client reply: “${result.reply}”` : result.reset ? "Demo reset. Start with Dana’s reminder." : "Demo step complete.");
+      const detail = runSummary ? `${result.reply ? `${priyaAction ? "Priya" : "Dana"}: “${result.reply}” ` : ""}${runSummary}` : result.message ?? (result.status ? `Payment recorded. The invoice is now ${result.status.toLowerCase().replaceAll("_", " ")}.` :result.reply ? `Client reply: “${result.reply}”` : result.reset ? "Demo reset. Start with Dana’s story above." : "Demo step complete.");
       setFeedback(detail);
       router.refresh();
     } catch (cause) {
@@ -85,8 +90,8 @@ export function DemoControls({
   return (
     <div className={compact ? "space-y-2" : "rounded-2xl border bg-card p-5 shadow-sm"}>
       {!compact ? <div className="mb-4">
-        <p className="text-sm font-semibold">{invoiceId ? "Walk through Dana’s payment plan" : "Demo controls"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{paypalMode === "sandbox" ? "PayPal Sandbox, test money only" : "Simulated PayPal"}{invoiceId ? " · Dana’s replies are guided so the walkthrough is repeatable" : ""}</p>
+        <h2 className="font-semibold">{title ?? (invoiceId ? "Walk through Dana’s payment plan" : "Demo controls")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description ?? `${paypalMode === "sandbox" ? "PayPal Sandbox, test money only" : "Simulated PayPal"}${invoiceId ? " · Dana’s replies are guided so the walkthrough is repeatable" : ""}`}</p>
       </div> : null}
       {invoiceId ? <ol aria-label="Dana demo progress" className="mb-4 grid gap-2 sm:grid-cols-3">{demoSteps.map((label, index) => {
         const complete = progressStep > index;
@@ -112,7 +117,7 @@ export function DemoControls({
           {busy === `time-${days}` ? <LoaderCircle className="size-4 animate-spin" /> : <Clock3 className="size-4" />}
           Advance time +{days} days
         </button>) : null}
-        {!compact && showReset ? <button type="button" disabled={busy !== null} onClick={() => setConfirmReset(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
+        {showReset ? <button type="button" disabled={busy !== null} onClick={() => setConfirmReset(true)} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-60">
           {busy === "reset" ? <LoaderCircle className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
           Reset demo
         </button> : null}
@@ -122,13 +127,13 @@ export function DemoControls({
       {stepComplete && !planComplete && !paymentComplete && (!paymentInvoiceId || paypalMode === "sandbox") ? <p className="mt-3 text-sm text-muted-foreground">
         {showPlanLink && invoiceId ? <><Link className="font-medium text-primary hover:underline" href={`/invoices/${invoiceId}`}>Open Dana’s invoice</Link> to review the schedule and {paypalMode === "mock" ? "simulate the deposit" : "pay the deposit in PayPal Sandbox"}.</> : paypalMode === "sandbox" && paymentInvoiceId ? "Use the deposit’s Open in PayPal link below to pay in Sandbox." : "Review the installment schedule below."}
       </p> : null}
-      {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
+      {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}{resultLink ? <> <a href={resultLink.href} className="font-semibold text-primary underline">{resultLink.label}</a></> : null}</p> : null}
       {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
       {confirmReset ? <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmReset(false); }}>
         <section id="reset-demo-dialog" role="alertdialog" aria-modal="true" aria-labelledby="reset-demo-title" aria-describedby="reset-demo-description" className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
           <div className="mb-4 grid size-11 place-items-center rounded-xl bg-amber-100 text-amber-800"><RotateCcw className="size-5" /></div>
           <h2 id="reset-demo-title" className="text-lg font-semibold">Reset the demo workspace?</h2>
-          <p id="reset-demo-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">This restores the fictional invoices and clears demo messages, approvals, and audit activity. You can run the walkthrough again afterward.</p>
+          <p id="reset-demo-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">Everyone viewing this demo shares one workspace. Resetting restores the five fictional invoices and clears messages, approvals and audit activity for everyone. You can run both stories again afterward.</p>
           <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setConfirmReset(false)} className="min-h-10 rounded-lg border px-4 text-sm font-medium transition hover:bg-secondary">Keep current demo</button><button type="button" disabled={busy !== null} onClick={() => { setConfirmReset(false); void post("/api/demo/reset", {}, "reset"); }} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">{busy === "reset" ? "Resetting…" : "Reset demo"}</button></div>
         </section>
       </div> : null}

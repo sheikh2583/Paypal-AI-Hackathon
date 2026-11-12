@@ -3,7 +3,7 @@
 import type { ApprovalKind, ChaseState, InvoiceStatus, PlanStatus, ReplyClassification } from "./types";
 
 export const chaseStateLabels: Record<ChaseState, string> = {
-  NEW: "Not contacted yet",
+  NEW: "No reminder yet",
   NUDGED: "Reminder sent",
   NEGOTIATING: "Negotiating",
   PLAN_OFFERED: "Plan offered",

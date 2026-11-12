@@ -31,12 +31,30 @@ export function riskFeaturesForInvoice(invoice: InvoiceRow, database: AppDb, now
   };
 }
 
-function templateExplanation(result: RiskResult): string {
+/** Turns a stored factor label such as "Days overdue (23)" into words an owner would use. */
+export function plainFactor(factor: string): string {
+  const value = /\(([^)]*)\)/.exec(factor)?.[1] ?? '';
+  if (factor.startsWith('Days overdue')) return `${value} days overdue`;
+  if (factor.startsWith('Invoice amount')) return `the amount (${value})`;
+  if (factor.startsWith('Client late count')) return `paid late ${value} ${value === '1' ? 'time' : 'times'} before`;
+  if (factor.startsWith('Avg days late')) return `usually pays ${value} days late`;
+  if (factor.startsWith('Responsiveness')) return value === 'high' ? 'usually replies quickly' : value === 'low' ? 'often slow to reply' : 'replies within a few days';
+  if (factor.startsWith('Unanswered nudges')) return `${value} unanswered ${value === '1' ? 'reminder' : 'reminders'}`;
+  if (factor === 'Partial payment made') return 'has already paid part';
+  return factor.toLowerCase();
+}
+
+export function templateExplanation(result: RiskResult): string {
   const notable = result.factors.filter((factor) => factor.impact !== 0 && factor.factor !== 'Base score');
-  if (notable.length === 0) return `Risk score ${result.score}: the invoice is recent, under $500, and has no recorded late-payment or response concerns.`;
-  const highest = [...notable].sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact)).slice(0, 2);
-  const reasons = highest.map((factor) => `${factor.factor} (${factor.impact > 0 ? '+' : ''}${factor.impact})`).join(' and ');
-  return `Risk score ${result.score}: the main factors are ${reasons}.`;
+  if (notable.length === 0) return `Risk ${result.score} of 100: a recent, small invoice from a client with no history of paying late.`;
+  const ranked = [...notable].sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact)).slice(0, 2);
+  const raising = ranked.filter((factor) => factor.impact > 0).map((factor) => plainFactor(factor.factor));
+  const lowering = ranked.filter((factor) => factor.impact < 0).map((factor) => plainFactor(factor.factor));
+  const parts = [
+    raising.length ? `mostly because it is ${raising.join(' and ')}` : '',
+    lowering.length ? `${raising.length ? 'helped by' : 'kept low because the client'} ${lowering.join(' and ')}` : '',
+  ].filter(Boolean);
+  return `Risk ${result.score} of 100, ${parts.join(', ')}.`;
 }
 
 export async function refreshRisk(invoiceId: string, database: AppDb = db, at = getNow()): Promise<RiskResult> {
@@ -49,7 +67,7 @@ export async function refreshRisk(invoiceId: string, database: AppDb = db, at = 
     if (getLlmEnv().mode === 'live') {
       try {
         const structured = await getLLM().structured({
-          system: 'Write a concise one or two sentence explanation of a deterministic invoice risk score. Use only the provided risk factors and do not infer extra facts.',
+          system: 'Explain to a busy freelancer, in one short plain-English sentence, why this overdue invoice has this risk score out of 100 (higher means less likely to be paid). Name the one or two biggest reasons in everyday words. Use only the provided factors and do not infer extra facts. Do not use the words deterministic, factor, base score, impact or algorithm.',
           input: JSON.stringify({ score: result.score, factors: result.factors }),
           schema: explanationSchema,
         });

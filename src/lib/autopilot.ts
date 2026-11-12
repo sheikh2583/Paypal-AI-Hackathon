@@ -6,7 +6,7 @@ import { audit } from "./audit";
 import { getNow } from "./clock";
 import { db, type AppDb } from "./db/client";
 import { getKv, listInvoices, setKv } from "./db/queries";
-import { getLlmEnv } from "./env";
+import { getAppEnv, getLlmEnv } from "./env";
 import type { AgentRunResult, InvoiceRow } from "./types";
 
 const ENABLED_KEY = "autopilot_enabled";
@@ -25,6 +25,8 @@ export interface AutopilotStatus {
   lastRun: AutopilotLastRun | null;
   dueNow: number;
   intervalMinutes: number;
+  /** False when no CRON_SECRET is set, so the switch alone never triggers a scheduled check. */
+  scheduleConfigured: boolean;
 }
 
 export interface AutopilotRunResult {
@@ -55,7 +57,13 @@ export function getAutopilotStatus(database: AppDb = db): AutopilotStatus {
   if (raw) {
     try { lastRun = JSON.parse(raw) as AutopilotLastRun; } catch { lastRun = null; }
   }
-  return { enabled: isAutopilotEnabled(database), lastRun, dueNow: listDueInvoices(database).length, intervalMinutes: AUTOPILOT_INTERVAL_MINUTES };
+  return {
+    enabled: isAutopilotEnabled(database),
+    lastRun,
+    dueNow: listDueInvoices(database).length,
+    intervalMinutes: AUTOPILOT_INTERVAL_MINUTES,
+    scheduleConfigured: Boolean(getAppEnv().cronSecret),
+  };
 }
 
 /** Runs every due invoice through the agent. Scheduled triggers respect the switch; manual ones do not. */

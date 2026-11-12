@@ -16,7 +16,7 @@ const outcomeWords: Record<RunOutcome, string> = {
 };
 
 function describeOutcomes(outcomes: RunOutcome[]): string {
-  if (outcomes.length === 0) return "No invoices were due.";
+  if (outcomes.length === 0) return "Nothing needed a follow-up right now.";
   const counts = new Map<string, number>();
   for (const outcome of outcomes) counts.set(outcomeWords[outcome], (counts.get(outcomeWords[outcome]) ?? 0) + 1);
   const parts = [...counts.entries()].map(([word, count]) => `${count} ${word}`);
@@ -40,8 +40,12 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
       if (action === "run") {
         const failed = Array.isArray(result.failed) ? result.failed.length : 0;
         setFeedback(`${describeOutcomes((result.results ?? []).map(({ finalState }) => finalState))}${failed ? ` ${failed} could not run.` : ""}`);
+      } else if (!result.enabled) {
+        setFeedback("Autopilot is off. Chaser acts only when you ask.");
       } else {
-        setFeedback(result.enabled ? "Autopilot is on. Chaser checks due invoices on schedule and pauses for anything outside policy." : "Autopilot is off. Chaser acts only when you ask.");
+        setFeedback(status.scheduleConfigured
+          ? "Autopilot is on. Chaser follows up on due invoices by itself and stops for anything outside your limits."
+          : "Autopilot is on, but scheduled checks aren’t set up on this demo. Use “Check due invoices now”.");
       }
       router.refresh();
     } catch (cause) {
@@ -52,6 +56,9 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
   }
 
   const lastRun = status.lastRun;
+  const dueText = status.dueNow === 0
+    ? "No invoices are due for a follow-up right now."
+    : `${status.dueNow} ${status.dueNow === 1 ? "invoice is" : "invoices are"} due for a follow-up.`;
   return (
     <section aria-labelledby="autopilot-title" className="rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -61,8 +68,10 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
             <h2 id="autopilot-title" className="font-semibold">Autopilot</h2>
             <p className="text-sm text-muted-foreground">
               {status.enabled
-                ? `On. Every ${status.intervalMinutes} minutes Chaser checks due invoices and acts within your policy.`
-                : "Off. Chaser acts only when you click. Turn it on to let it chase due invoices unattended."}
+                ? status.scheduleConfigured
+                  ? `On. Every ${status.intervalMinutes} minutes Chaser follows up on due invoices by itself, inside your limits.`
+                  : "On, but scheduled checks aren’t set up here. Follow-ups run when you click below."
+                : "Off. Chaser only acts when you click. Turn it on to let Chaser follow up by itself."}
             </p>
           </div>
         </div>
@@ -70,6 +79,7 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
           type="button"
           role="switch"
           aria-checked={status.enabled}
+          aria-label="Autopilot"
           disabled={busy !== null}
           onClick={() => void call("toggle", "/api/autopilot", { enabled: !status.enabled })}
           className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-1.5 py-1 text-sm font-semibold transition disabled:opacity-60 ${status.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "bg-background text-muted-foreground"}`}
@@ -79,11 +89,9 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
         </button>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-        <span><span className="text-muted-foreground">Due now</span> <strong className="tabular-nums">{status.dueNow}</strong></span>
         <span className="text-muted-foreground">
-          {lastRun
-            ? <>Last run {new Date(lastRun.at).toLocaleString()} · {lastRun.trigger === "schedule" ? "scheduled" : "manual"} · {lastRun.ranCount} of {lastRun.dueCount} handled</>
-            : "No autopilot run yet."}
+          {dueText}
+          {lastRun ? <> Last check {new Date(lastRun.at).toLocaleString()}, {lastRun.ranCount} of {lastRun.dueCount} handled.</> : null}
         </span>
         <button
           type="button"
@@ -92,10 +100,10 @@ export function AutopilotCard({ status }: { status: AutopilotStatus }) {
           className="ml-auto inline-flex min-h-10 items-center gap-2 rounded-lg border bg-background px-4 py-2 text-sm font-semibold transition hover:bg-secondary disabled:opacity-60"
         >
           {busy === "run" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-          {busy === "run" ? "Checking due invoices…" : "Run a sweep now"}
+          {busy === "run" ? "Checking due invoices…" : "Check due invoices now"}
         </button>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">Scheduled sweeps respect this switch. Policy limits and owner approvals apply exactly as they do for manual runs.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Your limits and approvals apply exactly as they do when you click.</p>
       {feedback ? <p role="status" className="mt-3 text-sm text-emerald-700">{feedback}</p> : null}
       {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
     </section>

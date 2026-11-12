@@ -28,7 +28,7 @@ export function PayPalInvoicePanel({ invoice, mode, sync }: {
     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-[150px_1fr]">
       <dt className="text-muted-foreground">PayPal invoice ID</dt><dd>{invoice.paypalInvoiceId ? <PayPalCopyId id={invoice.paypalInvoiceId} /> : <span className="text-muted-foreground">Not issued yet</span>}</dd>
       <dt className="text-muted-foreground">Status</dt><dd>{invoiceStatusLabels[invoice.status]}</dd>
-      <dt className="text-muted-foreground">Last update from PayPal</dt><dd>{sync ? <><time dateTime={sync.at}>{new Date(sync.at).toLocaleString()}</time><span className="text-muted-foreground"> · {sync.source === "webhook" ? "webhook" : "status check"}</span></> : <span className="text-muted-foreground">No update received yet</span>}</dd>
+      <dt className="text-muted-foreground">Last update from PayPal</dt><dd>{sync ? <><time dateTime={sync.at}>{new Date(sync.at).toLocaleString()}</time><span className="text-muted-foreground"> · {sync.source === "webhook" ? "PayPal notified Chaser" : "Chaser checked with PayPal"}</span></> : <span className="text-muted-foreground">No update received yet</span>}</dd>
       {isRealSandbox && invoice.paypalInvoiceUrl && invoice.paypalInvoiceId ? <><dt className="text-muted-foreground">Payer link</dt><dd><a href={invoice.paypalInvoiceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">Open in PayPal <ExternalLink aria-hidden="true" className="size-3.5" /></a></dd></> : null}
     </dl>
   </section>;

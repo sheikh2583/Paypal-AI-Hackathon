@@ -82,14 +82,15 @@ export function InvoiceGrid({ rows }: { rows: InvoiceGridRow[] }) {
     return true;
   }), [rows, preset]);
 
+  // Lower-priority columns drop out on narrow screens so the table never needs a sideways scroll.
+  const [width, setWidth] = useState(1024);
   const columnDefs = useMemo<ColDef<InvoiceGridRow>[]>(() => [
-    { headerName: "Client / invoice", field: "clientName", cellRenderer: ClientCell, flex: 2, minWidth: 240, sortable: true, getQuickFilterText: ({ data }) => data ? `${data.clientName} ${data.number} ${data.description}` : "" },
-    { headerName: "Amount due", field: "amountDueCents", cellRenderer: AmountCell, flex: 1, minWidth: 150, sortable: true, comparator: (a: number | null, b: number | null) => (a ?? -1) - (b ?? -1), getQuickFilterText: ({ data }) => data?.amountDueCents === null ? "payment plan" : money(data?.amountDueCents ?? 0) },
-    { headerName: "Days overdue", field: "daysOverdue", flex: 0.8, minWidth: 120, sortable: true, type: "numericColumn", valueFormatter: ({ value, data }) => data?.resolved ? "—" : String(value) },
-    { headerName: "Risk", field: "riskScore", cellRenderer: RiskCell, flex: 0.9, minWidth: 130, sortable: true, getQuickFilterText: ({ data }) => data?.riskLabel ?? "" },
-    { headerName: "Stage", field: "stage", flex: 1, minWidth: 140, sortable: true },
-    { headerName: "Next action", field: "nextAction", cellRenderer: ActionCell, flex: 1.4, minWidth: 200, sortable: false },
-  ], []);
+    { headerName: "Client / invoice", field: "clientName", cellRenderer: ClientCell, flex: 2, minWidth: 190, sortable: true, getQuickFilterText: ({ data }) => data ? `${data.clientName} ${data.number} ${data.description}` : "" },
+    { headerName: "Amount due", field: "amountDueCents", cellRenderer: AmountCell, flex: 1.2, minWidth: 150, sortable: true, comparator: (a: number | null, b: number | null) => (a ?? -1) - (b ?? -1), getQuickFilterText: ({ data }) => data?.amountDueCents === null ? "payment plan" : money(data?.amountDueCents ?? 0) },
+    { headerName: "Risk", field: "riskScore", cellRenderer: RiskCell, flex: 0.9, minWidth: 115, sortable: true, hide: width < 470, getQuickFilterText: ({ data }) => data?.riskLabel ?? "" },
+    { headerName: "Stage", field: "stage", flex: 1, minWidth: 135, sortable: true, hide: width < 760 },
+    { headerName: "Next step", field: "nextAction", cellRenderer: ActionCell, flex: 1.4, minWidth: 180, sortable: false, hide: width < 640 },
+  ], [width]);
 
   return <div>
     <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
@@ -113,10 +114,11 @@ export function InvoiceGrid({ rows }: { rows: InvoiceGridRow[] }) {
         suppressCellFocus
         rowClass="cursor-pointer"
         getRowId={({ data }) => data.id}
+        onGridSizeChanged={({ clientWidth }) => setWidth((previous) => Math.abs(clientWidth - previous) > 8 ? clientWidth : previous)}
         onRowClicked={(event: RowClickedEvent<InvoiceGridRow>) => { if (event.data) router.push(`/invoices/${event.data.id}`); }}
         overlayNoRowsTemplate="<span class='text-sm'>No invoices match this view.</span>"
       />
     </div>
-    <p className="px-5 py-2 text-[11px] text-muted-foreground">Sort any column. Click a row to open the invoice.</p>
+    <p className="px-5 py-2 text-xs text-muted-foreground">Click any row to open that invoice. Click a column title to sort.</p>
   </div>;
 }

@@ -1,21 +1,21 @@
 # Demo video script (2:45)
 
-Record the [hosted Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com) in **PayPal Sandbox**. Open it a minute before recording so Render Free can wake, and click **Reset demo** once before you start. Click it once more after recording; resets have a 10-second cooldown.
+Record the [hosted Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com) in **PayPal Sandbox**. Open it a minute before recording so Render Free can wake, and open **Demo tools** in the Start here panel and click **Reset demo** once before you start. Do it once more after recording; resets have a 10-second cooldown.
 
-Every shot below was checked on the hosted site on Nov 12, 2026. Dana’s and Priya’s replies are scripted so the walkthrough is repeatable. Don’t claim owner emails or scheduled Autopilot sweeps in the video: the hosted demo has neither configured.
+Every shot below was checked on Nov 12, 2026; recheck the labels on the hosted site once before recording. Dana’s and Priya’s replies are scripted so the walkthrough is repeatable. Don’t claim owner emails or scheduled Autopilot sweeps in the video: the hosted demo has neither configured.
 
 ## Timed script
 
 | Time | On screen | Voiceover |
 |---|---|---|
-| 0:00–0:12 | Dashboard: **Outstanding $5,500.00**, **5 open invoices** | “I’ll pay you Friday. Friday never came. Maya is a freelancer with five overdue invoices, and chasing them is the worst part of her week.” |
-| 0:12–0:25 | Sidebar **PayPal Sandbox** badge, then the **Policy guardrails** card | “Chaser chases them for her. It’s wired to PayPal Invoicing, Sandbox test money here, and it works inside rules she sets once.” |
+| 0:00–0:12 | Dashboard: the **Start here** panel, then **Outstanding $5,500.00** | “I’ll pay you Friday. Friday never came. Maya is a freelancer with five overdue invoices, and chasing them is the worst part of her week.” |
+| 0:12–0:25 | Sidebar **PayPal Sandbox** badge, then the **Your limits** card | “Chaser chases them for her. It’s wired to PayPal Invoicing, Sandbox test money here, and it works inside rules she sets once.” |
 | 0:25–0:40 | **Policy** page | “At least 30% up front, no more than three payments, never more than 5% off. These rules live in code. The AI can suggest a plan, but the code decides.” |
-| 0:40–0:58 | Dana’s invoice, click **Start with a reminder** | “Dana owes $900 and is 23 days late. Chaser sends a friendly reminder in Maya’s tone.” |
+| 0:40–0:58 | Click **Start Dana’s story**, then **Start with a reminder** | “Dana owes $900 and is 23 days late. Chaser sends a friendly reminder in Maya’s tone.” |
 | 0:58–1:15 | Click **Continue to Dana’s reply** | “Dana asks to split it. Chaser offers $270 now and two payments of $315, inside Maya’s limits.” |
 | 1:15–1:35 | Click **Confirm plan and create invoices**. **Payment plan** shows Active and **Sum of installments = original invoice** | “She says yes, and Chaser creates three real PayPal invoices. They add up to exactly $900.” |
 | 1:35–1:55 | Open **Deposit**: the **PayPal** panel with the invoice ID and **Open in PayPal** | “Here’s the deposit’s PayPal invoice ID and the link Dana pays from. When PayPal reports a payment, Chaser checks the signature before it believes it.” |
-| 1:55–2:15 | Priya’s invoice, click **Priya asks for 40% off**, then **Approvals** | “Priya wants 40% off. That’s over Maya’s limit, so Chaser doesn’t decide. It brings it to Maya with the reason and a suggested reply.” |
+| 1:55–2:15 | Dashboard, **Start Priya’s story**, click **Priya asks for 40% off**, then **Answer Priya in Approvals** | “Priya wants 40% off. That’s over Maya’s limit, so Chaser doesn’t decide. It brings it to Maya with the reason and a suggested reply.” |
 | 2:15–2:28 | **Client reliability** | “Chaser also ranks clients by how they actually pay, from Maya’s own records, and explains every score.” |
 | 2:28–2:40 | **Audit log** summary tiles, expand one entry | “Every message, decision and PayPal event is written down, so Maya can see exactly why anything happened.” |
 | 2:40–2:45 | Dashboard | “Chaser. It chases the money and never promises what you didn’t approve.” |

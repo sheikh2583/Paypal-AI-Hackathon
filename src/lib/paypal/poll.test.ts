@@ -35,7 +35,7 @@ describe("PayPal reconciliation on workspace reads", () => {
   it("reconciles from the invoice API and dashboard and starts one 10 second timer in public production", async () => {
     const { GET } = await import("@/app/api/invoices/route");
     const { default: dashboard } = await import("@/app/(app)/page");
-    const { DemoControls } = await import("@/components/demo-controls");
+    const { StartHere } = await import("@/components/start-here");
 
     expect((await GET()).status).toBe(200);
     expect(test.reconcile).toHaveBeenCalledTimes(1);
@@ -43,7 +43,7 @@ describe("PayPal reconciliation on workspace reads", () => {
     const page = await dashboard();
     expect(test.reconcile).toHaveBeenCalledTimes(2);
     expect(Children.toArray(page.props.children).some((child) =>
-      isValidElement<{ showReset: boolean }>(child) && child.type === DemoControls && child.props.showReset,
+      isValidElement<{ showReset: boolean }>(child) && child.type === StartHere && child.props.showReset,
     )).toBe(true);
     expect(vi.getTimerCount()).toBe(1);
     await vi.advanceTimersByTimeAsync(5_000);

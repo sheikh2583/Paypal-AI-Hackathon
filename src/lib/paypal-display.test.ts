@@ -39,6 +39,6 @@ describe("PayPal display", () => {
 
   it("explains the empty webhook feed", () => {
     const markup = renderToStaticMarkup(createElement(PayPalActivity, { events: [] }));
-    expect(markup).toContain("PayPal events appear here as soon as an invoice is created, sent, or paid");
+    expect(markup).toContain("Nothing yet. When PayPal reports an invoice sent, paid or cancelled, it appears here.");
   });
 });

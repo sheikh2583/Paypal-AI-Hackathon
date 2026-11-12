@@ -32,7 +32,7 @@ export default function ApprovalsPage() {
   const emailed = emailedApprovalIds();
   return (
     <div className="space-y-6">
-      <PageHeader title="Approvals" description="Disputes and plans that need sign-off wait here for the owner." />
+      <PageHeader title="Approvals" description="Decisions Chaser left for you. It won’t answer the client until you decide." />
       {pending.length === 0 ? (
         <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><CheckCircle2 className="size-6" /></span>

@@ -22,10 +22,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </a>
 
       <aside className="border-b bg-card p-3 md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0 md:border-b-0 md:border-r md:p-4">
-        <div className="mb-3 px-3 md:mb-6">
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 md:mb-6 md:block">
           <p className="text-lg font-semibold tracking-tight">Chaser</p>
-          <p className="hidden text-xs text-muted-foreground md:block">Invoice collections agent</p>
-          <p className="mt-2 inline-flex rounded-full bg-accent px-2.5 py-1 text-sm font-semibold text-accent-foreground">{llm.mode === "live" ? `Live AI · ${llmProviderLabel(llm)}` : "Guided demo"}</p>
+          <p className="hidden text-xs text-muted-foreground md:block">Chases late invoices for you</p>
+          <p title={llm.mode === "live" ? "Chaser's messages are written by a live AI model." : "Chaser's messages follow a script."} className="inline-flex rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground md:mt-2 md:text-sm">{llm.mode === "live" ? `Live AI · ${llmProviderLabel(llm)}` : "Guided demo"}</p>
           <PayPalModeBadge mode={paypal.mode} credentialsConfigured={Boolean(paypal.clientId && paypal.clientSecret)} />
         </div>
         <AppNav demoPublic={demoPublic} />

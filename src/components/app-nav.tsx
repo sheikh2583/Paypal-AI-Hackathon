@@ -52,7 +52,7 @@ export function AppNav({ demoPublic }: { demoPublic: boolean }) {
   }
 
   return (
-    <nav aria-label="Main" className="grid grid-cols-2 gap-1 md:flex md:flex-col">
+    <nav aria-label="Main" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
       {NAV_ITEMS.map((item) => {
         const active = isActive(pathname, item);
         const Icon = item.icon;

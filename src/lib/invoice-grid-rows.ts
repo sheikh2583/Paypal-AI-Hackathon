@@ -24,7 +24,8 @@ export interface InvoiceGridRow {
 export function toInvoiceGridRow({ invoice, client, daysOverdue, riskLabel, nextAction, pendingApprovalId }: InvoiceListItem): InvoiceGridRow {
   const planPaid = invoice.status === "SUPERSEDED" && invoice.chaseState === "RESOLVED";
   const superseded = invoice.status === "SUPERSEDED";
-  const due = new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const due = new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const lateness = daysOverdue > 0 ? `${daysOverdue} ${daysOverdue === 1 ? "day" : "days"} late · due ${due}` : `Due ${due}`;
   return {
     id: invoice.id,
     clientName: client.name,
@@ -32,7 +33,7 @@ export function toInvoiceGridRow({ invoice, client, daysOverdue, riskLabel, next
     number: invoice.number,
     description: invoice.description,
     amountDueCents: planPaid ? 0 : superseded ? null : Math.max(0, invoice.amountCents - invoice.paidCents),
-    amountDetail: planPaid ? "Plan paid in full" : superseded ? "Replaced by installments" : `Due ${due}`,
+    amountDetail: planPaid ? "Plan paid in full" : superseded ? "Replaced by installments" : lateness,
     dueAt: invoice.dueAt,
     daysOverdue: planPaid || superseded ? 0 : daysOverdue,
     riskScore: invoice.riskScore ?? 0,
