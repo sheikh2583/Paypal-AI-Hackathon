@@ -2,11 +2,15 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LockKeyhole, LogOut, Send } from "lucide-react";
+import { LoaderCircle, LockKeyhole, LogOut, MousePointerClick, Send } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 /** Password sign-in for clients. Their accounts are created by the owner, so there is no sign-up here. */
-export function ClientLoginForm({ notice }: { notice?: string }) {
+export function ClientLoginForm({ notice, demo }: {
+  notice?: string;
+  /** Public demo only: a published fictional account the "Click for demo" button fills in (D78). */
+  demo?: { name: string; email: string; password: string };
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +19,18 @@ export function ClientLoginForm({ notice }: { notice?: string }) {
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await signInWith(email, password);
+  }
+
+  async function signInAsDemo() {
+    if (!demo) return;
+    // Fill the visible fields first so the visitor sees which account they are using.
+    setEmail(demo.email);
+    setPassword(demo.password);
+    await signInWith(demo.email, demo.password);
+  }
+
+  async function signInWith(email: string, password: string) {
     setBusy(true);
     setError("");
     try {
@@ -35,6 +51,12 @@ export function ClientLoginForm({ notice }: { notice?: string }) {
   return (
     <form onSubmit={(event) => void signIn(event)} className="space-y-4">
       {notice ? <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{notice}</p> : null}
+      {demo ? <div className="rounded-xl border border-primary/25 bg-accent/60 p-4">
+        <button type="button" disabled={busy} onClick={() => void signInAsDemo()} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
+          {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo
+        </button>
+        <p className="mt-2 text-xs leading-relaxed text-accent-foreground">Signs you in as {demo.name}, a fictional client, with a public demo account. You&apos;ll see only {demo.name.split(" ")[0]}&apos;s invoices.</p>
+      </div> : null}
       <div><label htmlFor="client-email" className="mb-1.5 block text-sm font-medium">Email</label><input id="client-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="you@example.com" /></div>
       <div><label htmlFor="client-password" className="mb-1.5 block text-sm font-medium">Password</label><input id="client-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="Your password" /></div>
       <button type="submit" disabled={busy} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <LockKeyhole className="size-4" aria-hidden="true" />}{busy ? "Signing in…" : "Sign in"}</button>

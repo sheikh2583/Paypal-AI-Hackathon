@@ -3,16 +3,18 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CircleDollarSign, LoaderCircle, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CircleDollarSign, LoaderCircle, LockKeyhole, MousePointerClick, ShieldCheck, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm({ authConfigured, ownerAccountExists, testingSender, emailVerified, previewOnly = false }: {
+export function LoginForm({ authConfigured, ownerAccountExists, testingSender, emailVerified, previewOnly = false, demoDisplay }: {
   authConfigured: boolean;
   ownerAccountExists: boolean;
   testingSender: boolean;
   emailVerified: boolean;
   /** Public demo: show the real sign-in screen with every control disabled. */
   previewOnly?: boolean;
+  /** Public demo: the "Click for demo" button shows these values, then opens the workspace (D78). */
+  demoDisplay?: { email: string; maskedPassword: string };
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -118,6 +120,16 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
           <div className="mb-8"><p className="text-sm font-medium text-primary">Owner workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">{step === "otp" ? "Check your email" : "Sign in securely"}</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step === "otp" ? `Enter the one-time code sent to ${email}.` : "Use your owner account to review invoices, approvals, and agent activity."}</p></div>
 
           {previewOnly ? <div role="note" className="mb-5 rounded-xl border border-primary/25 bg-accent/60 p-4 text-sm leading-relaxed text-accent-foreground">
+            {demoDisplay ? <button type="button" disabled={busy} onClick={() => {
+              // The owner sign-in needs a code emailed to the real owner, so the demo only fills the
+              // fields for show and opens the workspace, which the public demo leaves open.
+              setBusy(true);
+              setEmail(demoDisplay.email);
+              setPassword(demoDisplay.maskedPassword);
+              setTimeout(() => { router.push("/"); }, 700);
+            }} className="mb-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
+              {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo
+            </button> : null}
             <p className="font-semibold">Preview: sign-in is turned off in the public demo</p>
             <p className="mt-1">So you can look around without an account, this demo skips sign-in. A real Chaser workspace sits behind this screen: the owner&apos;s password, then a one-time code emailed to the owner, with email verification and password reset. Only one owner account can exist.</p>
             <Link href="/" className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">Back to the demo <ArrowRight className="size-4" aria-hidden="true" /></Link>

@@ -20,7 +20,36 @@ function password(): string {
   return [0, 5, 10, 15].map((start) => chars.slice(start, start + 5).join("")).join("-");
 }
 
+/**
+ * `pnpm clients:accounts --demo` creates (or repairs) the public demo sign-ins from
+ * src/lib/demo-accounts.ts with their fixed, published passwords (D78).
+ */
+async function ensureDemoAccounts(): Promise<void> {
+  const { DEMO_CLIENT_ACCOUNTS } = await import("../src/lib/demo-accounts");
+  const { auth, ensureAuthSchema } = await import("../src/lib/auth");
+  const { db } = await import("../src/lib/db/client");
+  await ensureAuthSchema();
+  db.$client.exec("CREATE TABLE IF NOT EXISTS client_accounts (email text PRIMARY KEY, client_id text NOT NULL, created_at text NOT NULL)");
+  const context = await auth.$context;
+  for (const account of DEMO_CLIENT_ACCOUNTS) {
+    const hash = await context.password.hash(account.password);
+    const existing = await context.internalAdapter.findUserByEmail(account.email, { includeAccounts: true });
+    if (!existing) {
+      const user = await context.internalAdapter.createUser({ email: account.email, name: `${account.name} (demo)`, emailVerified: true }, { method: "admin" });
+      await context.internalAdapter.linkAccount({ userId: user.id, providerId: "credential", accountId: user.id, password: hash });
+    } else {
+      // Put the published password back in case anyone changed it.
+      await context.internalAdapter.updatePassword(existing.user.id, hash);
+      await context.internalAdapter.updateUser(existing.user.id, { emailVerified: true, twoFactorEnabled: false });
+    }
+    db.$client.prepare("INSERT INTO client_accounts (email, client_id, created_at) VALUES (?, ?, ?) ON CONFLICT(email) DO UPDATE SET client_id = excluded.client_id").run(account.email, account.clientId, new Date().toISOString());
+    const signedIn = await auth.api.signInEmail({ body: { email: account.email, password: account.password } }).then(() => true).catch(() => false);
+    console.log(`${account.name} demo sign-in: ${existing ? "repaired" : "created"}, sign-in check ${signedIn ? "passed" : "FAILED"}.`);
+  }
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes("--demo")) { await ensureDemoAccounts(); return; }
   const reset = process.argv.includes("--reset-passwords");
   const pairs = (process.env.CLIENT_ACCOUNTS ?? "").split(",").map((item) => item.trim()).filter(Boolean).map((item) => {
     const [clientId, email] = item.split("=").map((part) => part?.trim() ?? "");

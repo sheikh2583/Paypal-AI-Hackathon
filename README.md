@@ -20,7 +20,7 @@ See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued pla
 - A PayPal panel with stored invoice IDs and recipient links when available, installment amounts and statuses, and a dashboard activity feed for received webhooks. Webhooks and polling reconcile invoice state.
 - Scripted client replies for a repeatable demo, with an adapter for a configured live LLM.
 - Better Auth owner setup for private deployments: password plus a one-time code emailed to the owner, with verification and reset. Public demo mode bypasses the owner gate for the fictional workspace and shows the owner sign-in read-only.
-- A **client portal** at `/client`: clients sign in with accounts the owner creates (`pnpm clients:accounts`), see only their own invoices, plans and PayPal pay links, and can reply to Chaser.
+- A **client portal** at `/client`: clients sign in with accounts the owner creates (`pnpm clients:accounts`), see only their own invoices, plans and PayPal pay links, and can reply to Chaser. On the public demo, **Click for demo** signs in as a fictional demo client.
 
 ## Architecture
 

@@ -3,8 +3,16 @@ import { auth, authNotConfiguredResponse, ensureAuthSchema, getAuthReadiness, ge
 import { db } from "@/lib/db/client";
 import { getAuthEnv } from "@/lib/env";
 import { consumeEmailVerificationToken, resetPasswordIdentifier } from "@/lib/auth-tokens";
+import { isDemoClientEmail } from "@/lib/demo-accounts";
 
 const handlers = toNextJsHandler(auth);
+
+const CLIENT_LOCKED_ENDPOINTS = new Set([
+  "/change-password", "/change-email", "/update-user", "/delete-user",
+  "/revoke-session", "/revoke-sessions", "/revoke-other-sessions",
+  "/link-social", "/unlink-account",
+  "/two-factor/enable", "/two-factor/disable", "/two-factor/generate-backup-codes",
+]);
 
 export async function GET(request: Request): Promise<Response> {
   await ensureAuthSchema();
@@ -23,6 +31,20 @@ export async function POST(request: Request): Promise<Response> {
   if (!getAuthReadiness().ready) return authNotConfiguredResponse();
 
   const url = new URL(request.url);
+  // Client accounts, including the published demo one, are managed by the owner (D77, D78).
+  // Blocking these stops one visitor from changing the demo password or ending other visitors' sessions.
+  if (CLIENT_LOCKED_ENDPOINTS.has(url.pathname.replace(/^\/api\/auth/, ""))) {
+    const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+    if (session && session.user.email.toLowerCase() !== getAuthEnv().ownerEmail) {
+      return Response.json({ error: { code: "CLIENT_ACCOUNT_LOCKED", message: "Client accounts are managed by the business owner." } }, { status: 403 });
+    }
+  }
+  if (url.pathname === "/api/auth/request-password-reset") {
+    const body = await request.clone().json().catch(() => null) as { email?: unknown } | null;
+    if (typeof body?.email === "string" && isDemoClientEmail(body.email)) {
+      return Response.json({ error: { code: "CLIENT_ACCOUNT_LOCKED", message: "The demo account's password can't be reset." } }, { status: 403 });
+    }
+  }
   if (url.pathname === "/api/auth/sign-up/email") {
     const authEnv = getAuthEnv();
     if (await getOwnerAccountExists()) {
