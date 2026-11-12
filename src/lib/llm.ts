@@ -200,7 +200,9 @@ export class OpenAICompatibleLLM implements LLM {
     const run: PoolRun = { failed: new Set() };
     for (let iteration = 0; iteration < opts.maxIterations; iteration++) {
       if (opts.signal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
-      const data = await this.request({ messages, tools, ...(opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {}) }, run, opts.signal, opts.onProviderCall);
+      // A required tool is forced on the first request only; later turns let the model finish (D79).
+      const forced = iteration === 0 && opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {};
+      const data = await this.request({ messages, tools, ...forced }, run, opts.signal, opts.onProviderCall);
       const choices = data.choices as Array<{ message?: { content?: string | null; tool_calls?: OpenAiToolCall[] } }> | undefined;
       const message = choices?.[0]?.message;
       if (!message?.tool_calls?.length) return { summary: message?.content ?? '', toolCalls };
@@ -343,7 +345,8 @@ class AnthropicLLM implements LLM {
     let iterations = 0;
     // Current Claude models reject a forced tool_choice, so a required tool is requested in the
     // prompt and the loop stays on `auto` with parallel calls disabled.
-    const system = opts.toolChoiceName
+    // Only the first request carries it, so the model can go on to confirm to the client (D79).
+    const firstSystem = opts.toolChoiceName
       ? `${opts.system}\n\nCall the ${opts.toolChoiceName} tool now, before anything else.`
       : opts.system;
 
@@ -354,10 +357,10 @@ class AnthropicLLM implements LLM {
           {
             model: this.model,
             max_tokens: 4096,
-            system,
+            system: iterations === 0 ? firstSystem : opts.system,
             messages,
             tools: sdkTools,
-            tool_choice: { type: 'auto', disable_parallel_tool_use: Boolean(opts.toolChoiceName) },
+            tool_choice: { type: 'auto', disable_parallel_tool_use: iterations === 0 && Boolean(opts.toolChoiceName) },
             ...this.outputConfig(),
           },
           { signal },

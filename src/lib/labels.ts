@@ -76,6 +76,7 @@ const auditActions: Record<string, string> = {
   "agent.iteration_cap": "Stopped at the tool-call limit",
   "llm.fallback": "Switched to the guided reply after a provider error",
   "llm.call": "Asked the AI model",
+  "policy.discount_cap": "Policy check sent a discount request to you",
   "owner.notified": "Emailed you about a pending decision",
   "autopilot.run": "Autopilot checked due invoices",
   "autopilot.toggle": "Autopilot setting changed",
@@ -162,6 +163,11 @@ export function auditResultSummary(action: string, result: unknown, ok: boolean,
   if (action === "create_plan_invoices" && typeof fields.installmentsCreated === "number") return `${fields.installmentsCreated} installment invoices created and sent through PayPal.`;
   if (action === "schedule_followup" && typeof fields.nextFollowupAt === "string") return `Next follow-up on ${fields.nextFollowupAt.slice(0, 10)}.`;
   if (action === "llm.fallback") return "The guided reply finished the step so the client still got an answer.";
+  if (action === "policy.discount_cap") {
+    const asked = typeof given.requestedPercent === "number" ? `${given.requestedPercent}%` : "The discount";
+    const cap = typeof given.capPercent === "number" ? `${given.capPercent}%` : "your limit";
+    return `${asked} is above your ${cap} limit, so the code sent it to Approvals.`;
+  }
   if (action === "llm.call") {
     // Only the key number and model are shown, never the key (D75).
     const who = typeof given.keyNumber === "number" ? `Key #${given.keyNumber}` : "The model";

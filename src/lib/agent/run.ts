@@ -1,6 +1,6 @@
 import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
-import { getClient, getInvoice, getMessages, getPlan, getPolicy, insertMessage, listInvoices, updateInvoice } from '../db/queries';
+import { getClient, getInvoice, getMessages, getPlan, getPolicy, insertMessage, listInvoices, listPlansByInvoiceId, updateInvoice } from '../db/queries';
 import { audit, auditProviderCall } from '../audit';
 import { getLLM, ScriptedLLM, isRetryableLlmError, type LLM, type ToolCallRequest } from '../llm';
 import { getLlmEnv } from '../env';
@@ -18,6 +18,8 @@ export type AgentRunTrigger = 'manual' | 'due' | 'sim' | 'approval';
 export interface AgentRunOptions {
   database?: AppDb;
   llm?: LLM;
+  /** Used instead of the generic persona script if the live model fails before any side effect. */
+  fallbackLlm?: LLM;
   paypal?: PayPalClient;
   timeoutMs?: number;
 }
@@ -48,6 +50,10 @@ export async function runAgent(
     const unansweredNudges = messages.slice(messages.findLastIndex((message) => message.direction === 'client_to_agent') + 1)
       .filter((message) => message.direction === 'agent_to_client').length;
     const llm = options.llm ?? getLLM(client.persona ?? 'dana');
+    // Once the client has accepted a plan, issuing its invoices is the next step. The model is asked to
+    // call that tool first, and is given the plan ID, instead of being trusted to remember it (D79).
+    const acceptedPlan = listPlansByInvoiceId(invoiceId, database).find((plan) => plan.status === 'ACCEPTED');
+    const requiredTool = acceptedPlan ? 'create_plan_invoices' : undefined;
     const system = buildSystemPrompt({
       minDepositPercent: policy.minDepositPercent,
       maxInstallments: policy.maxInstallments,
@@ -93,11 +99,16 @@ export async function runAgent(
         system,
         messages: [{
           role: 'user',
-          content: JSON.stringify({ invoiceId, latestClientMessage: lastClientMessage ? wrapClientMessage(lastClientMessage.body) : null }),
+          content: JSON.stringify({
+            invoiceId,
+            latestClientMessage: lastClientMessage ? wrapClientMessage(lastClientMessage.body) : null,
+            ...(acceptedPlan ? { acceptedPlanId: acceptedPlan.id, nextStep: 'The client accepted this plan. Issue its installment invoices with create_plan_invoices, then confirm to the client.' } : {}),
+          }),
         }],
         tools: agentTools,
         maxIterations: MAX_TOOL_ITERATIONS,
         signal: controller.signal,
+        ...(requiredTool ? { toolChoiceName: requiredTool } : {}),
         onProviderCall: (record) => auditProviderCall(record, { invoiceId, purpose: 'agent_run', provider: getLlmEnv().provider }, database),
         onToolCall: async (call) => {
           const { name } = call;
@@ -121,7 +132,7 @@ export async function runAgent(
           ? error.message
           : 'TRANSIENT_PROVIDER_ERROR';
         audit({ actor: 'agent', action: 'llm.fallback', invoiceId, input: { provider: llmEnv.provider, reason }, result: { ok: true, fallback: 'scripted' }, ok: true }, database);
-        result = await new ScriptedLLM(client.persona ?? 'dana').runToolLoop({
+        result = await (options.fallbackLlm ?? new ScriptedLLM(client.persona ?? 'dana')).runToolLoop({
           system, messages: [{ role: 'user', content: JSON.stringify({ invoiceId, latestClientMessage: lastClientMessage ? wrapClientMessage(lastClientMessage.body) : null }) }],
           tools: agentTools, maxIterations: MAX_TOOL_ITERATIONS, signal: controller.signal,
           onToolCall: async (call) => {

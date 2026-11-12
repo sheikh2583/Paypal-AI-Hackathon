@@ -12,10 +12,10 @@ Every shot below was checked on Nov 12, 2026; recheck the labels on the hosted s
 | 0:12–0:25 | Sidebar **PayPal Sandbox** badge, then the **Your limits** card | “Chaser chases them for her. It’s wired to PayPal Invoicing, Sandbox test money here, and it works inside rules she sets once.” |
 | 0:25–0:40 | **Policy** page | “At least 30% up front, no more than three payments, never more than 5% off. These rules live in code. The AI can suggest a plan, but the code decides.” |
 | 0:40–0:58 | Click **Start Dana’s story**, then **Start with a reminder** | “Dana owes $900 and is 23 days late. Chaser sends a friendly reminder in Maya’s tone.” |
-| 0:58–1:15 | Click **Continue to Dana’s reply** | “Dana asks to split it. Chaser offers $270 now and two payments of $315, inside Maya’s limits.” |
+| 0:58–1:15 | Click **Continue to Dana’s reply** | “Dana asks to split it. Chaser, writing live with Gemini, offers a plan inside Maya’s limits: here, a deposit now and two payments later.” Read the amounts off the screen; in live mode they can differ from the scripted $270 / $315 / $315. |
 | 1:15–1:35 | Click **Confirm plan and create invoices**. **Payment plan** shows Active and **Sum of installments = original invoice** | “She says yes, and Chaser creates three real PayPal invoices. They add up to exactly $900.” |
 | 1:35–1:55 | Open **Deposit**: the **PayPal** panel with the invoice ID and **Open in PayPal** | “Here’s the deposit’s PayPal invoice ID and the link Dana pays from. When PayPal reports a payment, Chaser checks the signature before it believes it.” |
-| 1:55–2:15 | Dashboard, **Start Priya’s story**, click **Priya asks for 40% off**, then **Answer Priya in Approvals** | “Priya wants 40% off. That’s over Maya’s limit, so Chaser doesn’t decide. It brings it to Maya with the reason and a suggested reply.” |
+| 1:55–2:15 | Dashboard, **Start Priya’s story**, click **Priya asks for 40% off**, then **Answer Priya in Approvals** | “Priya wants 40% off. That’s over Maya’s 5% limit, and the limit lives in code, so the request goes to Maya with the reason and a suggested reply.” |
 | 2:15–2:28 | **Client reliability** | “Chaser also ranks clients by how they actually pay, from Maya’s own records, and explains every score.” |
 | 2:28–2:40 | **Audit log** summary tiles, expand one entry | “Every message, decision and PayPal event is written down, so Maya can see exactly why anything happened.” |
 | 2:40–2:45 | Dashboard | “Chaser. It chases the money and never promises what you didn’t approve.” |

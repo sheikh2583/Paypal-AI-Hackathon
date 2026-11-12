@@ -8,7 +8,8 @@ import type { AppDb } from "./db/client";
 import { getMessages, getPolicy, insertMessage, listApprovals, resolveApproval } from "./db/queries";
 import { demoError } from "./demo";
 import { emit } from "./events";
-import { ScriptedLLM } from "./llm";
+import { getLlmEnv } from "./env";
+import { getLLM, ScriptedLLM } from "./llm";
 import type { InvoiceRow } from "./types";
 
 export async function runPriyaDemoStep(invoice: InvoiceRow, database: AppDb, counter: boolean): Promise<Response> {
@@ -40,6 +41,22 @@ export async function runPriyaDemoStep(invoice: InvoiceRow, database: AppDb, cou
     insertMessage({ id: crypto.randomUUID(), invoiceId, direction: "client_to_agent", body: reply, createdAt: getNow(database).toISOString() }, database);
     applyClassification(invoiceId, scripts.priya.classifications[0], database);
   }
-  const run = await runAgent(invoiceId, "sim", { database, llm: new ScriptedLLM("priya", 1) });
+  // Priya's line is scripted; Chaser's answer is live when a model is configured, with the script as backup (D79).
+  const scripted = new ScriptedLLM("priya", 1);
+  const live = getLlmEnv().mode === "live" ? getLLM("priya") : undefined;
+  const run = await runAgent(invoiceId, "sim", { database, llm: live ?? scripted, fallbackLlm: scripted });
+  // The limit is enforced in code: a discount request above the owner's cap always reaches the owner,
+  // even if the live model answered without escalating.
+  const cap = getPolicy(database)?.maxDiscountPercent ?? 0;
+  const requested = scripts.priya.classifications[0]?.requestedDiscountPercent ?? 0;
+  if (requested > cap && !listApprovals(undefined, database).some((item) => item.invoiceId === invoiceId && item.kind === "DISCOUNT_REQUEST")) {
+    const now = getNow(database);
+    await handleToolCall("escalate_to_owner", {
+      invoiceId, kind: "DISCOUNT_REQUEST",
+      reason: `Priya asked for ${requested}% off, which is above your ${cap}% limit. The policy check sent it to you.`,
+      recommendation: `Decide whether to offer a goodwill discount of up to ${cap}%, or explain why the full amount stands.`,
+    }, database, now);
+    audit({ actor: "system", action: "policy.discount_cap", invoiceId, input: { requestedPercent: requested, capPercent: cap }, result: { escalated: true, reason: "model did not escalate" }, ok: true }, database, now.toISOString());
+  }
   return Response.json({ done: false, reply, run });
 }

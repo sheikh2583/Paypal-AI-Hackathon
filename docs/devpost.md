@@ -44,7 +44,7 @@ Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is
 
 1. Start on the dashboard. The **Start here** panel explains the demo and offers two stories. A reset workspace shows **Outstanding $5,500.00** and **5 open invoices**, with the **PayPal Sandbox** badge in the sidebar.
 2. Click **Start Dana’s story**. On Dana’s page, click **Start with a reminder**.
-3. Click **Continue to Dana’s reply** to see the scripted split request. Review the $270 deposit and two $315 installments, then click **Confirm plan and create invoices**.
+3. Click **Continue to Dana’s reply** to see the scripted split request. Chaser’s answers are written live by the model, and each one is labelled “written live” or “scripted reply”. Review the plan it proposes (the scripted version is a $270 deposit and two $315 installments), then click **Confirm plan and create invoices**.
 4. In **Payment plan**, check that the three installments show **Sum of installments = original invoice**. Each row shows its PayPal Sandbox invoice ID and an **Open in PayPal** link. Open **Deposit** to see its **PayPal** panel. The dashboard’s **PayPal activity** card lists signature-verified webhook events as they arrive.
 5. Open **Audit log** to see the tool calls and policy decisions, with the raw record behind each entry.
 6. Back on the dashboard, click **Start Priya’s story**, then **Priya asks for 40% off**. The request is above the 5% cap, so it goes to **Approvals** instead of being decided. Click **Answer Priya in Approvals**, where you can click **Send 5% goodwill counter**.

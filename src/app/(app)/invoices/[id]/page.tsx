@@ -18,7 +18,8 @@ import { PayPalCopyId } from "@/components/paypal-copy-id";
 import { PayPalPaidToast } from "@/components/paypal-paid-toast";
 import { installmentCheck, lastPayPalSync } from "@/lib/paypal/display";
 import { loadClientReliability } from "@/lib/reliability-read";
-import { approvalKindLabels, chaseStateLabels, invoiceStatusLabels, planStatusLabels } from "@/lib/labels";
+import { approvalKindLabels, chaseStateLabels, invoiceStatusLabels, llmProviderLabel, planStatusLabels } from "@/lib/labels";
+import { messageSources } from "@/lib/message-source";
 
 export const metadata: Metadata = { title: "Invoice" };
 export const dynamic = "force-dynamic";
@@ -47,6 +48,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const progressStep: 0 | 1 | 2 | 3 = planIssued ? 3 : plan ? 2 : messages.some((message) => message.direction === "agent_to_client") ? 1 : 0;
   const paypalMode = getPayPalEnv().mode;
   const invoiceAudit = listAudit(invoice.id, db);
+  // Labels each Chaser message with who wrote it: the live model or the script (D79).
+  const sources = messageSources(invoiceAudit);
+  const llmEnv = getLlmEnv();
+  const liveAi = llmEnv.mode === "live";
+  const providerName = llmProviderLabel(llmEnv);
   const paypalEvents = invoice.paypalInvoiceId ? listWebhookEventsForPayPalInvoice(invoice.paypalInvoiceId, db) : [];
   const paypalSync = lastPayPalSync(invoiceAudit, paypalEvents);
   const paidEvent = paypalMode === "sandbox" && invoice.status === "PAID"
@@ -78,7 +84,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       {demo && isDana ? <div id="try-it" className="scroll-mt-6"><DemoControls
         invoiceId={invoice.id}
         title="Dana’s story: she asks to split her bill"
-        description={`Click the button for each step. Dana’s replies are scripted so the story is the same every time. ${paypalMode === "sandbox" ? "The invoices are real PayPal Sandbox invoices paid with test money." : "PayPal is simulated here."}`}
+        description={`Click the button for each step. Dana’s lines are scripted so the story is repeatable. ${liveAi ? `Chaser’s answers are written live by ${providerName}, and your limits are checked in code.` : "Chaser’s answers follow a script here."} ${paypalMode === "sandbox" ? "The invoices are real PayPal Sandbox invoices paid with test money." : "PayPal is simulated here."}`}
         resultLink={planIssued ? { href: "#payment-plan", label: "See the payment plan" } : { href: "#conversation", label: "See it in the conversation" }}
         paymentInvoiceId={planIssued ? paymentTarget?.id : undefined}
         depositPayment={paymentTarget?.installmentNo === 1}
@@ -92,7 +98,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       {demo && showPriya ? <div id="try-it" className="scroll-mt-6"><DemoControls
         priyaAction={{ invoiceId: invoice.id }}
         title="Priya’s story: she asks for 40% off"
-        description="Your limit is 5% off. Click the button to send Priya’s request and watch Chaser hand the decision to you instead of answering it."
+        description={`Your limit is 5% off. Click to send Priya’s scripted request. ${liveAi ? `Chaser answers live with ${providerName}, ` : "Chaser answers, "}and the policy check hands the decision to you instead of letting it agree.`}
         paypalMode={paypalMode}
       /></div> : null}
       {demo && priyaEscalated ? <section id="try-it" className="scroll-mt-6 rounded-2xl border border-primary/25 bg-card p-5 shadow-sm">
@@ -127,7 +133,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
       {approvals.length > 0 ? <section className="rounded-2xl border bg-card p-5 shadow-sm"><h2 className="font-semibold">Owner approvals</h2><div className="mt-3 space-y-3">{approvals.map((approval) => <div key={approval.id} className="rounded-xl bg-secondary/60 p-4"><div className="flex flex-wrap justify-between gap-2"><p className="text-sm font-semibold">{approvalKindLabels[approval.kind]}</p><span className="text-xs text-muted-foreground">{approval.status.toLowerCase()}</span></div><p className="mt-2 text-sm">{approval.reason}</p><p className="mt-2 text-sm text-muted-foreground">Recommendation: {approval.recommendation}</p></div>)}</div></section> : null}
 
-      <section id="conversation" className="scroll-mt-6 rounded-2xl border bg-card shadow-sm"><div className="border-b px-5 py-4"><div className="flex items-center gap-2"><MessageCircle className="size-4 text-primary" /><h2 className="font-semibold">Conversation</h2></div><p className="mt-1 text-sm text-muted-foreground">Messages between Chaser and {firstName}, plus every action Chaser took.</p></div>{messages.length === 0 && !paidEvent ? <p className="p-5 text-sm text-muted-foreground">No messages yet.</p> : <ol className="space-y-3 p-5">{messages.map((message) => <li key={message.id} className={`max-w-2xl rounded-xl p-4 ${message.direction === "agent_to_client" ? "bg-primary text-primary-foreground" : message.direction === "client_to_agent" ? "ml-auto bg-accent text-accent-foreground" : "mx-auto bg-secondary text-muted-foreground"}`}><p className="mb-1 text-xs font-semibold uppercase tracking-wide">{message.direction === "agent_to_client" ? "Chaser" : message.direction === "client_to_agent" ? client.name : "Activity"}</p><p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p></li>)}{paidEvent ? <li className="mx-auto max-w-2xl rounded-xl bg-emerald-50 p-4 text-emerald-800"><p className="font-semibold">Paid via PayPal</p><p className="mt-1 text-xs">Confirmed by a verified PayPal event</p><time className="mt-1 block text-xs" dateTime={paidEvent.processedAt ?? paidEvent.receivedAt}>{new Date(paidEvent.processedAt ?? paidEvent.receivedAt).toLocaleString()}</time></li> : null}</ol>}</section>
+      <section id="conversation" className="scroll-mt-6 rounded-2xl border bg-card shadow-sm"><div className="border-b px-5 py-4"><div className="flex items-center gap-2"><MessageCircle className="size-4 text-primary" /><h2 className="font-semibold">Conversation</h2></div><p className="mt-1 text-sm text-muted-foreground">Messages between Chaser and {firstName}, plus every action Chaser took.</p></div>{messages.length === 0 && !paidEvent ? <p className="p-5 text-sm text-muted-foreground">No messages yet.</p> : <ol className="space-y-3 p-5">{messages.map((message) => <li key={message.id} className={`max-w-2xl rounded-xl p-4 ${message.direction === "agent_to_client" ? "bg-primary text-primary-foreground" : message.direction === "client_to_agent" ? "ml-auto bg-accent text-accent-foreground" : "mx-auto bg-secondary text-muted-foreground"}`}><p className="mb-1 text-xs font-semibold uppercase tracking-wide">{message.direction === "agent_to_client" ? (sources.get(message.id) === "live" ? `Chaser · written live by ${providerName}` : sources.get(message.id) === "scripted" ? "Chaser · scripted reply" : "Chaser") : message.direction === "client_to_agent" ? client.name : "Activity"}</p><p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p></li>)}{paidEvent ? <li className="mx-auto max-w-2xl rounded-xl bg-emerald-50 p-4 text-emerald-800"><p className="font-semibold">Paid via PayPal</p><p className="mt-1 text-xs">Confirmed by a verified PayPal event</p><time className="mt-1 block text-xs" dateTime={paidEvent.processedAt ?? paidEvent.receivedAt}>{new Date(paidEvent.processedAt ?? paidEvent.receivedAt).toLocaleString()}</time></li> : null}</ol>}</section>
 
       {!closed ? <ClientReplyBox invoiceId={invoice.id} clientName={firstName} ownerName={getPolicy(db)?.ownerName?.split(" ")[0] ?? "the owner"} liveAi={getLlmEnv().mode === "live"} collapsed={guidedStoryOpen} /> : null}
     </div>

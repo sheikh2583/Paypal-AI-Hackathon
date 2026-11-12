@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { getNow } from '@/lib/clock';
 import { getClient, getInvoice, getMessages, insertMessage, listPlansByInvoiceId } from '@/lib/db/queries';
 import { db } from '@/lib/db/client';
-import { ScriptedLLM } from '@/lib/llm';
+import { getLLM, ScriptedLLM } from '@/lib/llm';
 import { applyClassification } from '@/lib/agent/classify';
 import { runAgent } from '@/lib/agent/run';
 import { scripts } from '@/lib/agent/scripts';
 import { guardDemoRoute, withDemoMutation } from '@/lib/demo';
-import { getPayPalEnv } from '@/lib/env';
+import { getLlmEnv, getPayPalEnv } from '@/lib/env';
 import { runPriyaDemoStep } from '@/lib/demo-priya';
 
 const inputSchema = z.object({ invoiceId: z.string().min(1), action: z.literal('priya-counter').optional() }).strict();
@@ -74,7 +74,11 @@ async function runDemoStep(invoiceId: string, action?: 'priya-counter'): Promise
   }
 
   try {
-    const run = await runAgent(invoiceId, 'sim', { database: db, llm: new ScriptedLLM(client.persona, turn, invoice.planId) });
+    // Dana's lines stay scripted so the story is repeatable; Chaser answers with the live model when one
+    // is configured, and this step's script takes over only if the provider fails first (D79).
+    const scripted = new ScriptedLLM(client.persona, turn, invoice.planId);
+    const live = getLlmEnv().mode === 'live' ? getLLM(client.persona) : undefined;
+    const run = await runAgent(invoiceId, 'sim', { database: db, llm: live ?? scripted, fallbackLlm: scripted });
     return Response.json({ done: false, reply: replyText, run });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'AGENT_RUN_FAILED';

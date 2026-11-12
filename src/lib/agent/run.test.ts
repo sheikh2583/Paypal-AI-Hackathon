@@ -199,6 +199,46 @@ describe('agent runs', () => {
     }
   });
 
+  it('asks for the invoices first once the client has accepted a plan, and passes the plan ID', async () => {
+    await seeded();
+    const paypal = new MockPayPalClient(database);
+    const scripted = new ScriptedLLM('dana');
+    await runAgent('invoice-dana-900', 'manual', { database, llm: scripted, paypal });
+    insertMessage({ id: 'reply-1', invoiceId: 'invoice-dana-900', direction: 'client_to_agent', body: 'Can I split this?', createdAt: DEMO_NOW.toISOString() }, database);
+    applyClassification('invoice-dana-900', { intent: 'cannot_pay_full', confidence: 0.95 }, database);
+    await runAgent('invoice-dana-900', 'sim', { database, llm: scripted, paypal });
+    insertMessage({ id: 'reply-2', invoiceId: 'invoice-dana-900', direction: 'client_to_agent', body: 'Yes, that works.', createdAt: DEMO_NOW.toISOString() }, database);
+    applyClassification('invoice-dana-900', { intent: 'accepts_plan', confidence: 0.95 }, database);
+
+    let seen: { toolChoiceName?: string; content?: string } = {};
+    const watching: LLM = {
+      async structured<T>() { return {} as T; },
+      async runToolLoop(options) {
+        seen = { toolChoiceName: options.toolChoiceName, content: String(options.messages[0]?.content) };
+        return scripted.runToolLoop(options);
+      },
+    };
+    await runAgent('invoice-dana-900', 'sim', { database, llm: watching, paypal });
+    expect(seen.toolChoiceName).toBe('create_plan_invoices');
+    expect(JSON.parse(seen.content ?? '{}')).toMatchObject({ acceptedPlanId: expect.any(String) });
+  });
+
+  it('uses the given step script, not the generic one, when the live model fails first', async () => {
+    await seeded();
+    const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
+    Object.assign(process.env, { LLM_MODE: 'live', LLM_PROVIDER: 'openai-compatible', LLM_API_KEY: 'test-key', LLM_BASE_URL: 'https://provider.test/v1', LLM_MODEL: 'test-model' });
+    const failing: LLM = { async structured<T>() { return {} as T; }, async runToolLoop() { throw Object.assign(new Error('LLM_HTTP_503'), { status: 503 }); } };
+    let fallbackUsed = false;
+    const stepScript: LLM = { async structured<T>() { return {} as T; }, async runToolLoop() { fallbackUsed = true; return { summary: 'Step script answered.', toolCalls: [] }; } };
+    try {
+      const result = await runAgent('invoice-dana-900', 'sim', { database, llm: failing, fallbackLlm: stepScript });
+      expect(fallbackUsed).toBe(true);
+      expect(result.summary).toContain('scripted fallback');
+    } finally {
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }
+    }
+  });
+
   it('does not fall back after a side-effecting tool has run', async () => {
     await seeded();
     const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
