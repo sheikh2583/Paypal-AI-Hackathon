@@ -128,8 +128,9 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
               setPassword(demoDisplay.maskedPassword);
               setTimeout(() => { router.push("/"); }, 700);
             }} className="mb-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
-              {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo
+              {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo: open Maya&apos;s workspace
             </button> : null}
+            {demoDisplay ? <p className="mb-3 text-xs">Maya is the freelancer who gets paid. Her workspace is where Chaser chases her late invoices.</p> : null}
             <p className="font-semibold">Preview: sign-in is turned off in the public demo</p>
             <p className="mt-1">So you can look around without an account, this demo skips sign-in. A real Chaser workspace sits behind this screen: the owner&apos;s password, then a one-time code emailed to the owner, with email verification and password reset. Only one owner account can exist.</p>
             <Link href="/" className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">Back to the demo <ArrowRight className="size-4" aria-hidden="true" /></Link>

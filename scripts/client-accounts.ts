@@ -106,7 +106,9 @@ async function main(): Promise<void> {
     lines.push(`| ${client.name} | ${email} | ${newPassword ?? "(unchanged; rerun with --reset-passwords to replace)"} |`);
   }
 
-  writeFileSync("client-accounts.local.md", [
+  // CLIENT_ACCOUNTS_FILE lets a local test write elsewhere instead of overwriting the real list.
+  const outputFile = process.env.CLIENT_ACCOUNTS_FILE || "client-accounts.local.md";
+  writeFileSync(outputFile, [
     "# Chaser client sign-ins (local only, gitignored; never commit)",
     "",
     `Created ${now}. Sign in at /client/login on the hosted demo.`,
@@ -116,7 +118,7 @@ async function main(): Promise<void> {
     ...lines,
     "",
   ].join("\n"));
-  console.log("Wrote client-accounts.local.md (gitignored). Passwords are not printed here.");
+  console.log(`Wrote ${outputFile}. Passwords are not printed here.`);
 }
 
 void main().catch((error: unknown) => {

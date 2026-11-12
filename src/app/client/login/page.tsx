@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CircleDollarSign } from "lucide-react";
+import { ArrowRight, CircleDollarSign } from "lucide-react";
 import { ClientLoginForm } from "@/components/client-portal";
 import { getClientSession } from "@/lib/client-access";
 import { DEMO_CLIENT_ACCOUNTS } from "@/lib/demo-accounts";
@@ -23,6 +23,9 @@ export default async function ClientLoginPage({ searchParams }: { searchParams: 
         <p className="mt-6 text-sm font-medium text-primary">Client portal</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">See and pay your invoices</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Sign in with the email and password your freelancer set up for you. You&apos;ll see only your own invoices, payment plans and messages.</p>
+        {demoAccount ? <Link href="/" className="mt-5 flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm font-semibold text-primary shadow-sm hover:bg-secondary">
+          <span>Looking for the freelancer&apos;s side? Open Maya&apos;s workspace</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+        </Link> : null}
         <div className="mt-8"><ClientLoginForm
           notice={reason === "not-client" ? "That account isn't linked to a client. Sign in with a client account." : undefined}
           demo={demoAccount ? { name: demoAccount.name, email: demoAccount.email, password: demoAccount.password } : undefined}

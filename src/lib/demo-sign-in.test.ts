@@ -27,8 +27,9 @@ describe("Click for demo", () => {
     const { ClientLoginForm } = await import("@/components/client-portal");
     const demo = DEMO_CLIENT_ACCOUNTS[0];
     const withDemo = renderToStaticMarkup(createElement(ClientLoginForm, { demo }));
-    expect(withDemo).toContain("Click for demo");
-    expect(withDemo).toContain("Signs you in as Dana Whitfield, a fictional client");
+    expect(withDemo).toContain("Click for demo: sign in as Dana");
+    expect(withDemo).toContain("Dana is a client who owes Maya; this is what clients see.");
+    expect(withDemo).toContain("public demo account for Dana Whitfield, a fictional client");
     expect(renderToStaticMarkup(createElement(ClientLoginForm, {}))).not.toContain("Click for demo");
     expect(demo.email.endsWith("@example.com")).toBe(true);
     expect(isDemoClientEmail(" DANA.demo@example.com ")).toBe(true);
@@ -37,7 +38,8 @@ describe("Click for demo", () => {
   it("shows the owner demo button on the sign-in preview only", async () => {
     const { LoginForm } = await import("@/components/login-form");
     const base = { authConfigured: true, ownerAccountExists: true, testingSender: false, emailVerified: false };
-    expect(renderToStaticMarkup(createElement(LoginForm, { ...base, previewOnly: true, demoDisplay: { email: "maya@example.com", maskedPassword: "••••" } }))).toContain("Click for demo");
+    expect(renderToStaticMarkup(createElement(LoginForm, { ...base, previewOnly: true, demoDisplay: { email: "maya@example.com", maskedPassword: "••••" } }))).toContain("Click for demo: open Maya&#x27;s workspace");
+    expect(renderToStaticMarkup(createElement(LoginForm, { ...base, previewOnly: true, demoDisplay: { email: "maya@example.com", maskedPassword: "••••" } }))).toContain("Maya is the freelancer who gets paid.");
     expect(renderToStaticMarkup(createElement(LoginForm, base))).not.toContain("Click for demo");
   });
 });

@@ -53,9 +53,9 @@ export function ClientLoginForm({ notice, demo }: {
       {notice ? <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{notice}</p> : null}
       {demo ? <div className="rounded-xl border border-primary/25 bg-accent/60 p-4">
         <button type="button" disabled={busy} onClick={() => void signInAsDemo()} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
-          {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo
+          {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <MousePointerClick className="size-4" aria-hidden="true" />} Click for demo: sign in as {demo.name.split(" ")[0]}
         </button>
-        <p className="mt-2 text-xs leading-relaxed text-accent-foreground">Signs you in as {demo.name}, a fictional client, with a public demo account. You&apos;ll see only {demo.name.split(" ")[0]}&apos;s invoices.</p>
+        <p className="mt-2 text-xs leading-relaxed text-accent-foreground">{demo.name.split(" ")[0]} is a client who owes Maya; this is what clients see. It uses a public demo account for {demo.name}, a fictional client, and shows only {demo.name.split(" ")[0]}&apos;s invoices.</p>
       </div> : null}
       <div><label htmlFor="client-email" className="mb-1.5 block text-sm font-medium">Email</label><input id="client-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="you@example.com" /></div>
       <div><label htmlFor="client-password" className="mb-1.5 block text-sm font-medium">Password</label><input id="client-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="Your password" /></div>
