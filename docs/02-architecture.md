@@ -67,6 +67,7 @@ src/
     audit.ts
     events.ts                     # event bus
     llm.ts
+    llm-pool.ts                   # key rotation, cooldowns and scrubbing for the OpenAI-compatible adapter (D75)
     llm-smoke.ts                 # manual live-mode structured + read-only tool-loop smoke
     db/{schema.ts,client.ts,queries.ts,seed.ts}
     paypal/{index.ts,real.ts,mock.ts,auth.ts,map.ts,reconcile.ts}

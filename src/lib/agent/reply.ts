@@ -4,6 +4,7 @@ import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
 import { getClient, getInvoice, getMessages, insertMessage } from '../db/queries';
 import { getLlmEnv } from '../env';
+import { auditProviderCall } from '../audit';
 import { emit } from '../events';
 import { getLLM, type LLM } from '../llm';
 import type { AgentRunResult, ReplyClassification } from '../types';
@@ -46,7 +47,8 @@ export async function replyAsClient(
   const context = `Invoice ${invoice.number} for ${money(invoice.amountCents)} was due ${invoice.dueAt.slice(0, 10)}; status ${invoice.status}; stage ${invoice.chaseState}.`;
   let classification: ReplyClassification;
   try {
-    classification = await classifyClientReply(body, context, client.persona ?? undefined, llm);
+    classification = await classifyClientReply(body, context, client.persona ?? undefined, llm,
+      (record) => auditProviderCall(record, { invoiceId, purpose: 'classify_reply', provider: getLlmEnv().provider }, database));
   } catch {
     // A failed classification is treated as unclear; the agent run still decides what to do.
     classification = { intent: 'unclear', confidence: 0 };

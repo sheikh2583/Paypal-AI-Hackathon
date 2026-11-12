@@ -8,7 +8,8 @@ const sensitiveKey = /(token|secret|authorization)/i;
 const emailPattern = /\b([A-Z0-9._%+-])[A-Z0-9._%+-]*@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi;
 
 function redactText(value: string): string {
-  return value.replace(emailPattern, "$1***@$2");
+  // Google API keys can appear in provider error text; never let one reach the log.
+  return value.replace(emailPattern, "$1***@$2").replace(/AIza[0-9A-Za-z_-]{10,}/g, "[redacted]");
 }
 
 function redactValue(value: unknown, seen: WeakSet<object>): unknown {
@@ -47,6 +48,29 @@ export interface AuditInput {
   input?: unknown;
   result?: unknown;
   ok: boolean;
+}
+
+/**
+ * Records one AI provider call by key number and model (D75). The key, headers, URL and prompt are never
+ * passed in, so they cannot reach the audit log.
+ */
+export function auditProviderCall(
+  record: { keyNumber: number; model: string; latencyMs: number; status: number; ok: boolean },
+  context: { invoiceId?: string | null; purpose: string; provider: string },
+  database: AppDb = db,
+): void {
+  try {
+    audit({
+      actor: "system",
+      action: "llm.call",
+      invoiceId: context.invoiceId ?? undefined,
+      input: { provider: context.provider, purpose: context.purpose, keyNumber: record.keyNumber, model: record.model },
+      result: { status: record.status, latencyMs: record.latencyMs },
+      ok: record.ok,
+    }, database);
+  } catch {
+    // Auditing a provider call must never break the call itself.
+  }
 }
 
 export function audit(entry: AuditInput, database: AppDb = db, at = getNow().toISOString()): AuditEntry {

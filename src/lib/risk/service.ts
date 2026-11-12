@@ -4,6 +4,7 @@ import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
 import { getClient, getInvoice, getMessages, updateInvoice } from '../db/queries';
 import { getLLM } from '../llm';
+import { auditProviderCall } from '../audit';
 import type { InvoiceRow, RiskResult } from '../types';
 import { computeRisk, type RiskFeatures } from './index';
 
@@ -70,6 +71,7 @@ export async function refreshRisk(invoiceId: string, database: AppDb = db, at = 
           system: 'Explain to a busy freelancer, in one short plain-English sentence, why this overdue invoice has this risk score out of 100 (higher means less likely to be paid). Name the one or two biggest reasons in everyday words. Use only the provided factors and do not infer extra facts. Do not use the words deterministic, factor, base score, impact or algorithm.',
           input: JSON.stringify({ score: result.score, factors: result.factors }),
           schema: explanationSchema,
+          onProviderCall: (record) => auditProviderCall(record, { invoiceId, purpose: 'risk_explanation', provider: getLlmEnv().provider }, database),
         });
         explanation = explanationSchema.parse(structured).explanation;
       } catch {

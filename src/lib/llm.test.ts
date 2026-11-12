@@ -14,7 +14,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
   },
 }));
 
-const anthropicEnv = (model: string) => ({ provider: 'anthropic' as const, apiKey: 'test-secret-123', model, baseUrl: undefined, maxHistory: 20, configuredMode: 'live' as const, mode: 'live' as const });
+const anthropicEnv = (model: string) => ({ provider: 'anthropic' as const, apiKey: 'test-secret-123', apiKeys: [], fallbackModel: undefined, poolExclude: [], model, baseUrl: undefined, maxHistory: 20, configuredMode: 'live' as const, mode: 'live' as const });
 
 describe('AnthropicLLM request shape', () => {
   afterEach(() => { anthropicCalls.length = 0; });

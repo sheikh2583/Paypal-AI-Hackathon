@@ -7,6 +7,7 @@ import { setClockDatabaseForTests, setClockOffset } from '../clock';
 import { MockPayPalClient } from '../paypal/mock';
 import type { LLM } from '../llm';
 import { OpenAICompatibleLLM, ScriptedLLM } from '../llm';
+import { KeyPool } from '../llm-pool';
 import { applyClassification } from './classify';
 import { runAgent, runDueAgents } from './run';
 import { buildSystemPrompt } from './prompt';
@@ -147,6 +148,51 @@ describe('agent runs', () => {
       expect(getMessages('invoice-dana-900', database).some((message) => message.direction === 'system' && message.body.includes('scripted fallback'))).toBe(true);
       expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
       expect(listAudit('invoice-dana-900', database).some((entry) => entry.action === 'llm.fallback' && (entry.input as { provider?: string }).provider === 'openai-compatible')).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }
+    }
+  });
+
+  it('with a key pool: falls back to the guided reply only when every key is busy before any side effect, and audits key numbers', async () => {
+    await seeded();
+    const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
+    Object.assign(process.env, { LLM_MODE: 'live', LLM_PROVIDER: 'openai-compatible', LLM_API_KEY: 'key-one', LLM_BASE_URL: 'https://provider.test/v1', LLM_MODEL: 'test-model' });
+    const fetchMock = vi.fn(async () => new Response('{"error":{"status":"RESOURCE_EXHAUSTED","details":[{"retryDelay":"40s"}]}}', { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const pooled = new OpenAICompatibleLLM('https://provider.test/v1', ['key-one', 'key-two', 'key-three'], 'test-model', { pool: new KeyPool(3, ['test-model'], Date.now, () => undefined) });
+    try {
+      const result = await runAgent('invoice-dana-900', 'manual', { database, llm: pooled, paypal: new MockPayPalClient(database) });
+      expect(result.summary).toContain('scripted fallback');
+      // Each key exactly once for the agent turn, with no waiting when more than one key exists.
+      const calls = listAudit('invoice-dana-900', database).filter((entry) => entry.action === 'llm.call' && (entry.input as { purpose: string }).purpose === 'agent_run');
+      expect(calls.map((entry) => (entry.input as { keyNumber: number }).keyNumber).sort()).toEqual([1, 2, 3]);
+      expect(JSON.stringify(listAudit(undefined, database))).not.toMatch(/key-one|key-two|key-three/);
+    } finally {
+      vi.unstubAllGlobals();
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }
+    }
+  });
+
+  it('with a key pool: after a side effect, an exhausted pool neither falls back nor re-runs the tool', async () => {
+    await seeded();
+    const saved = { LLM_MODE: process.env.LLM_MODE, LLM_PROVIDER: process.env.LLM_PROVIDER, LLM_API_KEY: process.env.LLM_API_KEY, LLM_BASE_URL: process.env.LLM_BASE_URL, LLM_MODEL: process.env.LLM_MODEL };
+    Object.assign(process.env, { LLM_MODE: 'live', LLM_PROVIDER: 'openai-compatible', LLM_API_KEY: 'key-one', LLM_BASE_URL: 'https://provider.test/v1', LLM_MODEL: 'test-model' });
+    let call = 0;
+    const fetchMock = vi.fn(async () => {
+      call += 1;
+      if (call === 1) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: null, tool_calls: [{ id: 't1', type: 'function', function: { name: 'send_message', arguments: JSON.stringify({ invoiceId: 'invoice-dana-900', body: 'Pool reminder' }) } }] } }] }), { status: 200 });
+      }
+      return new Response('{"error":{"status":"RESOURCE_EXHAUSTED"}}', { status: 429 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const pooled = new OpenAICompatibleLLM('https://provider.test/v1', ['key-one', 'key-two'], 'test-model', { pool: new KeyPool(2, ['test-model'], Date.now, () => undefined) });
+    try {
+      await expect(runAgent('invoice-dana-900', 'manual', { database, llm: pooled, paypal: new MockPayPalClient(database) })).rejects.toThrow('LLM_HTTP_429');
+      expect(fetchMock).toHaveBeenCalledTimes(3); // one answer, then each key once for the next turn
+      expect(listAudit('invoice-dana-900', database).some((entry) => entry.action === 'llm.fallback')).toBe(false);
+      expect(getMessages('invoice-dana-900', database).filter((message) => message.body === 'Pool reminder')).toHaveLength(1);
     } finally {
       vi.unstubAllGlobals();
       for (const [key, value] of Object.entries(saved)) { if (value === undefined) { delete process.env[key]; } else { process.env[key] = value; } }

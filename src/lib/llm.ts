@@ -6,6 +6,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { getNow } from './clock';
 import { wrapClientMessage } from './agent/prompt';
 import { toJSONSchema as zodToJsonSchema } from 'zod';
+import { KeyPool, nextPacificMidnight, parseRateLimit, PER_MINUTE_COOLDOWN_MS, type PoolCombo } from './llm-pool';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -41,12 +42,15 @@ export interface RunToolLoopOptions {
   toolChoiceName?: string;
   /** Called for each tool the model wants to invoke; must return a JSON string. */
   onToolCall: (call: ToolCallRequest) => Promise<string>;
+  /** Called after every provider request with the key number, model and latency (never the key). */
+  onProviderCall?: (record: ProviderCallRecord) => void;
 }
 
 export interface StructuredOptions<T> {
   system: string;
   input: string;
   schema: import('zod').ZodType<T>;
+  onProviderCall?: (record: ProviderCallRecord) => void;
 }
 
 export interface LLM {
@@ -54,52 +58,132 @@ export interface LLM {
   structured<T>(opts: StructuredOptions<T>): Promise<T>;
 }
 
-/** Plain-fetch OpenAI Chat Completions adapter. Provider errors deliberately omit response bodies. */
-export class OpenAICompatibleLLM implements LLM {
-  // Free-tier providers regularly take 6-10 s per call; 20 s keeps one slow call from aborting a run.
-  constructor(private readonly baseUrl: string, private readonly apiKey: string, private readonly model: string, private readonly timeoutMs = 20_000) {}
+/** One provider call, described without the key itself (D75). */
+export interface ProviderCallRecord {
+  keyNumber: number;
+  model: string;
+  latencyMs: number;
+  /** HTTP status, or 0 for a timeout or network failure. */
+  status: number;
+  ok: boolean;
+}
 
-  private async request(body: Record<string, unknown>, outerSignal?: AbortSignal): Promise<Record<string, unknown>> {
-    let last: unknown;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-      try {
-        const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${this.apiKey}` },
-          body: JSON.stringify({ model: this.model, ...body }),
-          signal: outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal,
-        });
-        if (!response.ok) {
-          const error = new LlmRequestError(`LLM_HTTP_${response.status}`, response.status);
-          if (attempt === 0 && retryableStatus(response.status)) {
-            last = error;
-            // Honour the provider's retry-after or rate-limit reset on 429. Each attempt has its own
-            // timeout, so the wait is bounded separately to keep a UI request under about half a minute.
-            await new Promise((resolve) => setTimeout(resolve, response.status === 429 ? rateLimitWaitMs(response.headers) : 350));
-            continue;
-          }
-          throw error;
+type Attempt =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; kind: 'rate'; error: LlmRequestError; untilMs: number; retryAfterMs: number | null; perDay: boolean }
+  | { ok: false; kind: 'transient'; error: LlmRequestError }
+  | { ok: false; kind: 'auth'; error: LlmRequestError }
+  | { ok: false; kind: 'fatal'; error: LlmRequestError };
+
+/** Failed key + model combinations for one agent run or one structured call; each is tried at most once. */
+interface PoolRun { failed: Set<string>; waited: boolean }
+
+/** Plain-fetch OpenAI Chat Completions adapter over a pool of keys. Provider errors never include response bodies. */
+export class OpenAICompatibleLLM implements LLM {
+  private readonly keys: readonly string[];
+  private readonly models: readonly string[];
+  private readonly timeoutMs: number;
+  readonly pool: KeyPool;
+
+  // Free-tier providers regularly take 6-10 s per call; 20 s keeps one slow call from aborting a run.
+  constructor(
+    private readonly baseUrl: string,
+    apiKeys: string | readonly string[],
+    model: string,
+    options: { fallbackModel?: string; timeoutMs?: number; pool?: KeyPool } = {},
+  ) {
+    this.keys = typeof apiKeys === 'string' ? [apiKeys] : [...apiKeys];
+    this.models = [...new Set([model, options.fallbackModel].filter((value): value is string => Boolean(value)))];
+    this.timeoutMs = options.timeoutMs ?? 20_000;
+    this.pool = options.pool ?? new KeyPool(this.keys.length, this.models);
+  }
+
+  private async attempt(combo: PoolCombo, body: Record<string, unknown>, outerSignal: AbortSignal | undefined, onCall?: (record: ProviderCallRecord) => void): Promise<Attempt> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const started = Date.now();
+    const report = (status: number, ok: boolean) => onCall?.({ keyNumber: combo.keyIndex + 1, model: combo.model, latencyMs: Date.now() - started, status, ok });
+    try {
+      const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${this.keys[combo.keyIndex]}` },
+        body: JSON.stringify({ model: combo.model, ...body }),
+        signal: outerSignal ? AbortSignal.any([controller.signal, outerSignal]) : controller.signal,
+      });
+      if (response.ok) {
+        const data = await response.json() as Record<string, unknown>;
+        report(response.status, true);
+        return { ok: true, data };
+      }
+      report(response.status, false);
+      // The body is read only to classify the failure; it is never logged or returned.
+      const text = await response.text().catch(() => '');
+      const error = new LlmRequestError(`LLM_HTTP_${response.status}`, response.status);
+      if (response.status === 401 || response.status === 403 || /API key not valid|API_KEY_INVALID/i.test(text)) return { ok: false, kind: 'auth', error };
+      if (response.status === 429) {
+        const { perDay, retryAfterMs } = parseRateLimit(text, response.headers);
+        const now = Date.now();
+        return { ok: false, kind: 'rate', error, perDay, retryAfterMs, untilMs: perDay ? nextPacificMidnight(now) : now + (retryAfterMs ?? PER_MINUTE_COOLDOWN_MS) };
+      }
+      if (response.status >= 500) return { ok: false, kind: 'transient', error };
+      return { ok: false, kind: 'fatal', error };
+    } catch (error) {
+      if (outerSignal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
+      report(0, false);
+      if (error instanceof LlmRequestError) return { ok: false, kind: 'fatal', error };
+      return { ok: false, kind: 'transient', error: new LlmRequestError(controller.signal.aborted ? 'LLM_TIMEOUT' : 'LLM_NETWORK_ERROR') };
+    } finally { clearTimeout(timeout); }
+  }
+
+  /**
+   * Sends one request, rotating keys round-robin. A rate-limited model moves on to the fallback model on the
+   * same key, then to the next key; server errors and timeouts move straight to the next key. A 429 means the
+   * request never ran, so retrying it elsewhere is safe even after a side-effecting tool (D75).
+   */
+  private async request(body: Record<string, unknown>, run: PoolRun, outerSignal?: AbortSignal, onCall?: (record: ProviderCallRecord) => void): Promise<Record<string, unknown>> {
+    let last: LlmRequestError | undefined;
+    let shortestRateLimit: { combo: PoolCombo; waitMs: number } | undefined;
+    for (const keyIndex of this.pool.nextKeyOrder()) {
+      for (const model of this.models) {
+        const combo = { keyIndex, model };
+        const id = `${keyIndex}|${model}`;
+        if (run.failed.has(id) || !this.pool.isUsable(combo)) continue;
+        if (outerSignal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
+        const outcome = await this.attempt(combo, body, outerSignal, onCall);
+        if (outcome.ok) return outcome.data;
+        run.failed.add(id);
+        last = outcome.error;
+        if (outcome.kind === 'fatal') throw outcome.error;
+        if (outcome.kind === 'auth') { this.pool.disableKey(keyIndex, outcome.error.status ?? 0); break; }
+        if (outcome.kind === 'transient') { this.pool.coolDownKey(keyIndex); break; }
+        this.pool.coolDown(combo, outcome.untilMs);
+        if (!outcome.perDay) {
+          const waitMs = outcome.retryAfterMs ?? 350;
+          if (!shortestRateLimit || waitMs < shortestRateLimit.waitMs) shortestRateLimit = { combo, waitMs };
         }
-        return await response.json() as Record<string, unknown>;
-      } catch (error) {
-        const safe = error instanceof LlmRequestError ? error : new LlmRequestError(controller.signal.aborted || outerSignal?.aborted ? 'LLM_TIMEOUT' : 'LLM_NETWORK_ERROR');
-        last = safe;
-        if (attempt === 1 || !isRetryableLlmError(safe)) throw safe;
-        await new Promise((resolve) => setTimeout(resolve, 350));
-      } finally { clearTimeout(timeout); }
+      }
     }
-    throw last instanceof Error ? last : new LlmRequestError('LLM_REQUEST_FAILED');
+    // A pool of one key keeps the earlier single-key behaviour (D70): wait out a short per-minute limit once.
+    if (this.keys.length === 1 && !run.waited && shortestRateLimit && shortestRateLimit.waitMs <= MAX_RATE_LIMIT_WAIT_MS) {
+      run.waited = true;
+      await new Promise((resolve) => setTimeout(resolve, shortestRateLimit.waitMs));
+      const outcome = await this.attempt(shortestRateLimit.combo, body, outerSignal, onCall);
+      if (outcome.ok) return outcome.data;
+      last = outcome.error;
+      if (outcome.kind === 'rate') this.pool.coolDown(shortestRateLimit.combo, outcome.untilMs);
+    }
+    throw last ?? new LlmRequestError('LLM_POOL_EXHAUSTED', 429);
   }
 
   async runToolLoop(opts: RunToolLoopOptions): Promise<{ summary: string; toolCalls: ToolCallRecord[] }> {
+    // The full message array is rebuilt for every request, so whichever key answers sees the same conversation.
     const messages: LlmMessage[] = [{ role: 'system', content: opts.system }, ...opts.messages.slice(-getLlmEnv().maxHistory)];
     const tools = opts.tools.map((tool) => ({ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } }));
     const toolCalls: ToolCallRecord[] = [];
+    const run: PoolRun = { failed: new Set(), waited: false };
     for (let iteration = 0; iteration < opts.maxIterations; iteration++) {
       if (opts.signal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
-      const data = await this.request({ messages, tools, ...(opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {}) }, opts.signal);
+      const data = await this.request({ messages, tools, ...(opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {}) }, run, opts.signal, opts.onProviderCall);
       const choices = data.choices as Array<{ message?: { content?: string | null; tool_calls?: OpenAiToolCall[] } }> | undefined;
       const message = choices?.[0]?.message;
       if (!message?.tool_calls?.length) return { summary: message?.content ?? '', toolCalls };
@@ -130,12 +214,13 @@ export class OpenAICompatibleLLM implements LLM {
         const data = await this.request({
           messages: [{ role: 'system', content: `${opts.system}\nReturn only JSON matching this schema: ${JSON.stringify(zodJsonSchema(opts.schema))}` }, { role: 'user', content: opts.input }],
           response_format: { type: 'json_object' },
-        });
+        }, { failed: new Set(), waited: false }, undefined, opts.onProviderCall);
         const choices = data.choices as Array<{ message?: { content?: string | null } }> | undefined;
         return opts.schema.parse(JSON.parse(choices?.[0]?.message?.content ?? ''));
       } catch (error) {
         lastError = error;
-        if (isRetryableLlmError(error) || attempt === 1) throw sanitizeLlmError(error);
+        // Only malformed JSON earns a second try here; provider errors were already handled by the pool.
+        if (error instanceof LlmRequestError || attempt === 1) throw sanitizeLlmError(error);
       }
     }
     throw sanitizeLlmError(lastError);
@@ -145,8 +230,6 @@ export class OpenAICompatibleLLM implements LLM {
 export class LlmRequestError extends Error {
   constructor(public readonly code: string, public readonly status?: number) { super(code); this.name = 'LlmRequestError'; }
 }
-function retryableStatus(status: number): boolean { return status === 429 || status >= 500; }
-
 const MAX_RATE_LIMIT_WAIT_MS = 15_000;
 /** Parses "12", "10.5s", "2m59.56s" or "1h2m" style durations into milliseconds. */
 export function parseResetDuration(value: string | null): number | null {
@@ -476,11 +559,33 @@ export class ScriptedLLM implements LLM {
 // Factory
 // ---------------------------------------------------------------------------
 
+// One pool per process and configuration, so cooldowns learned by one request protect the next.
+const poolScope = globalThis as typeof globalThis & { chaserKeyPools?: Map<string, KeyPool> };
+function sharedPool(env: ReturnType<typeof getLlmEnv>): KeyPool {
+  const models = [...new Set([env.model, env.fallbackModel].filter((value): value is string => Boolean(value)))];
+  // The signature is a non-reversible fingerprint; keys themselves are never stored outside env.
+  let fingerprint = 2166136261;
+  for (const char of env.apiKeys.join('\n')) fingerprint = Math.imul(fingerprint ^ char.charCodeAt(0), 16777619) >>> 0;
+  const id = `${env.baseUrl}|${models.join(',')}|${env.apiKeys.length}|${fingerprint}`;
+  const pools = poolScope.chaserKeyPools ??= new Map();
+  let pool = pools.get(id);
+  if (!pool) {
+    pool = new KeyPool(env.apiKeys.length, models);
+    for (const combo of env.poolExclude) pool.exclude(combo, 'it failed the format check in pnpm llm:smoke --all (LLM_POOL_EXCLUDE)');
+    pools.set(id, pool);
+  }
+  return pool;
+}
+
+function openAICompatibleFromEnv(env: ReturnType<typeof getLlmEnv>): OpenAICompatibleLLM {
+  return new OpenAICompatibleLLM(env.baseUrl!, env.apiKeys, env.model, { fallbackModel: env.fallbackModel, pool: sharedPool(env) });
+}
+
 export function getLLM(persona = 'dana'): LLM {
   const env = getLlmEnv();
   if (env.mode === 'live') {
-    if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEY'} is required for live LLM mode`);
-    if (env.provider === 'openai-compatible') return new OpenAICompatibleLLM(env.baseUrl!, env.apiKey, env.model);
+    if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEYS'} is required for live LLM mode`);
+    if (env.provider === 'openai-compatible') return openAICompatibleFromEnv(env);
     return new AnthropicLLM(env.apiKey, env.model);
   }
   const existing = scriptedInstances.get(persona);
@@ -491,8 +596,8 @@ export function getLLM(persona = 'dana'): LLM {
 }
 
 export function createLiveLLM(env = getLlmEnv()): LLM {
-  if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEY'} is required for live LLM mode`);
-  if (env.provider === 'openai-compatible') return new OpenAICompatibleLLM(env.baseUrl!, env.apiKey, env.model);
+  if (!env.apiKey) throw new Error(`${env.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'LLM_API_KEYS'} is required for live LLM mode`);
+  if (env.provider === 'openai-compatible') return openAICompatibleFromEnv(env);
   return new AnthropicLLM(env.apiKey, env.model);
 }
 

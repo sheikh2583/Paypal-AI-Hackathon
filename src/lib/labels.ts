@@ -75,6 +75,7 @@ const auditActions: Record<string, string> = {
   agent_run: "Finished an agent run",
   "agent.iteration_cap": "Stopped at the tool-call limit",
   "llm.fallback": "Switched to the guided reply after a provider error",
+  "llm.call": "Asked the AI model",
   "owner.notified": "Emailed you about a pending decision",
   "autopilot.run": "Autopilot checked due invoices",
   "autopilot.toggle": "Autopilot setting changed",
@@ -161,6 +162,14 @@ export function auditResultSummary(action: string, result: unknown, ok: boolean,
   if (action === "create_plan_invoices" && typeof fields.installmentsCreated === "number") return `${fields.installmentsCreated} installment invoices created and sent through PayPal.`;
   if (action === "schedule_followup" && typeof fields.nextFollowupAt === "string") return `Next follow-up on ${fields.nextFollowupAt.slice(0, 10)}.`;
   if (action === "llm.fallback") return "The guided reply finished the step so the client still got an answer.";
+  if (action === "llm.call") {
+    // Only the key number and model are shown, never the key (D75).
+    const who = typeof given.keyNumber === "number" ? `Key #${given.keyNumber}` : "The model";
+    const model = typeof given.model === "string" ? ` · ${given.model}` : "";
+    const seconds = typeof fields.latencyMs === "number" ? ` · ${(fields.latencyMs / 1000).toFixed(1)} s` : "";
+    if (ok) return `${who}${model} answered${seconds}.`;
+    return `${who}${model} was busy or unavailable (${fields.status === 0 ? "no response" : `HTTP ${String(fields.status)}`}); Chaser moved on to another key or the guided reply.`;
+  }
   if (typeof fields.fallback === "string") return "Handled by the guided reply.";
   if (typeof fields.code === "string") return errorCodes[fields.code] ?? `Failed: ${fields.code.toLowerCase().replaceAll("_", " ")}`;
   if (typeof fields.message === "string") return fields.message;

@@ -1,7 +1,7 @@
 import { getNow } from '../clock';
 import { db, type AppDb } from '../db/client';
 import { getClient, getInvoice, getMessages, getPlan, getPolicy, insertMessage, listInvoices, updateInvoice } from '../db/queries';
-import { audit } from '../audit';
+import { audit, auditProviderCall } from '../audit';
 import { getLLM, ScriptedLLM, isRetryableLlmError, type LLM, type ToolCallRequest } from '../llm';
 import { getLlmEnv } from '../env';
 import type { AgentRunResult, PayPalClient, RunOutcome, ToolCallRecord } from '../types';
@@ -98,6 +98,7 @@ export async function runAgent(
         tools: agentTools,
         maxIterations: MAX_TOOL_ITERATIONS,
         signal: controller.signal,
+        onProviderCall: (record) => auditProviderCall(record, { invoiceId, purpose: 'agent_run', provider: getLlmEnv().provider }, database),
         onToolCall: async (call) => {
           const { name } = call;
           callsDispatched += 1;
@@ -116,7 +117,7 @@ export async function runAgent(
         const llmEnv = getLlmEnv();
         if (llmEnv.mode !== 'live' || sideEffectRan || !isRetryableLlmError(error)) throw error;
         fallbackUsed = true;
-        const reason = error instanceof Error && /^LLM_(HTTP_\d+|TIMEOUT|NETWORK_ERROR)/.test(error.message)
+        const reason = error instanceof Error && /^LLM_(HTTP_\d+|TIMEOUT|NETWORK_ERROR|POOL_EXHAUSTED)/.test(error.message)
           ? error.message
           : 'TRANSIENT_PROVIDER_ERROR';
         audit({ actor: 'agent', action: 'llm.fallback', invoiceId, input: { provider: llmEnv.provider, reason }, result: { ok: true, fallback: 'scripted' }, ok: true }, database);

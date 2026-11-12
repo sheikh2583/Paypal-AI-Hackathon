@@ -61,7 +61,12 @@ const llmSchema = z.object({
   LLM_PROVIDER: z.preprocess(blankToUndefined, z.enum(["anthropic", "openai-compatible"]).optional()),
   LLM_BASE_URL: z.preprocess(blankToUndefined, z.url().optional()),
   LLM_API_KEY: optionalString,
+  // Comma-separated pool of keys for the same provider, one per project (D75).
+  LLM_API_KEYS: optionalString,
   LLM_MODEL: z.preprocess(blankToUndefined, z.string().optional()),
+  LLM_MODEL_FALLBACK: z.preprocess(blankToUndefined, z.string().optional()),
+  // "keyNumber:model" pairs that failed `pnpm llm:smoke --all` for a format reason, comma-separated.
+  LLM_POOL_EXCLUDE: z.preprocess(blankToUndefined, z.string().optional()),
   LLM_MAX_HISTORY: z.preprocess(blankToUndefined, z.coerce.number().int().min(1).max(100).default(20)),
   LLM_MODE: z.preprocess(blankToUndefined, z.enum(["auto", "live", "scripted"]).default("auto")),
 });
@@ -182,10 +187,25 @@ export function getDatabaseEnv(source: EnvSource = process.env) {
 
 export type ResolvedLlmMode = "live" | "scripted";
 
+export const MAX_LLM_KEYS = 8;
+
+/** Splits LLM_API_KEYS, trimming items and dropping blanks and repeats; at most MAX_LLM_KEYS. */
+export function parseKeyPool(keys: string | undefined, single: string | undefined): string[] {
+  const listed = (keys ?? "").split(",").map((key) => key.trim()).filter(Boolean);
+  const source = listed.length > 0 ? listed : single ? [single.trim()].filter(Boolean) : [];
+  return [...new Set(source)].slice(0, MAX_LLM_KEYS);
+}
+
 export interface LlmEnv {
   provider: "anthropic" | "openai-compatible";
   baseUrl: string | undefined;
+  /** First key of the pool; kept for callers that only need to know a key exists. */
   apiKey: string | undefined;
+  /** OpenAI-compatible key pool. Never log these; refer to them as "key #N". */
+  apiKeys: string[];
+  fallbackModel: string | undefined;
+  /** Key + model combinations to leave out of the pool from startup (0-based key index). */
+  poolExclude: { keyIndex: number; model: string }[];
   model: string;
   maxHistory: number;
   /** What was configured: auto | live | scripted. */
@@ -196,8 +216,9 @@ export interface LlmEnv {
 
 export function getLlmEnv(source: EnvSource = process.env): LlmEnv {
   const e = parseGroup(llmSchema, source);
-  const provider = e.LLM_PROVIDER ?? (e.LLM_API_KEY ? "openai-compatible" : "anthropic");
-  const apiKey = provider === "anthropic" ? e.ANTHROPIC_API_KEY : e.LLM_API_KEY;
+  const apiKeys = parseKeyPool(e.LLM_API_KEYS, e.LLM_API_KEY);
+  const provider = e.LLM_PROVIDER ?? (apiKeys.length > 0 ? "openai-compatible" : "anthropic");
+  const apiKey = provider === "anthropic" ? e.ANTHROPIC_API_KEY : apiKeys[0];
   const hasKey = Boolean(apiKey);
   if (e.LLM_MODE === "live" && !hasKey) {
     throw new EnvError([
@@ -216,6 +237,12 @@ export function getLlmEnv(source: EnvSource = process.env): LlmEnv {
     provider,
     baseUrl: e.LLM_BASE_URL,
     apiKey,
+    apiKeys: provider === "anthropic" ? [] : apiKeys,
+    fallbackModel: provider === "anthropic" ? undefined : e.LLM_MODEL_FALLBACK,
+    poolExclude: (e.LLM_POOL_EXCLUDE ?? "").split(",").flatMap((item) => {
+      const match = /^\s*(\d+)\s*:\s*(\S+)\s*$/.exec(item);
+      return match ? [{ keyIndex: Number(match[1]) - 1, model: match[2] }] : [];
+    }),
     model: provider === "anthropic" ? e.ANTHROPIC_MODEL : (e.LLM_MODEL ?? ""),
     maxHistory: e.LLM_MAX_HISTORY,
     configuredMode: e.LLM_MODE,
