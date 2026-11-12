@@ -4,7 +4,7 @@ Chaser is an AI collections agent for freelancers and micro-businesses: it follo
 
 ![Chaser dashboard](docs/screenshots/dashboard.png)
 
-See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued plan and PayPal panel](docs/screenshots/invoice-paypal.png), [PayPal activity](docs/screenshots/paypal-activity.png), the [approvals inbox](docs/screenshots/approvals.png), and the [audit log](docs/screenshots/audit.png). These screenshots use local mock PayPal, including the test webhook in the activity feed.
+See [Dana before negotiation](docs/screenshots/dana-before.png), the [issued plan and PayPal panel](docs/screenshots/invoice-paypal.png), [PayPal activity](docs/screenshots/paypal-activity.png), the [approvals inbox](docs/screenshots/approvals.png), and the [audit log](docs/screenshots/audit.png). The screenshots were taken on the hosted PayPal Sandbox demo on Nov 12, 2026, including real Sandbox invoice IDs and verified webhooks in the activity feed. There is also a [phone view](docs/screenshots/phone-dashboard.png) of the dashboard.
 
 ## What is here
 
