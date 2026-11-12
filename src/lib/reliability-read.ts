@@ -41,11 +41,16 @@ export async function loadClientReliability() {
     )).all();
   const escalations = db.select({ invoiceId: approvals.invoiceId, at: approvals.createdAt })
     .from(approvals).where(eq(approvals.kind, "DISCOUNT_REQUEST")).all();
+  // The moment the installment invoices were issued is when the plan replaced the original invoice.
+  const replacements = db.select({ invoiceId: auditLog.invoiceId, at: auditLog.at })
+    .from(auditLog).where(and(eq(auditLog.action, "create_plan_invoices"), eq(auditLog.ok, true), isNotNull(auditLog.invoiceId))).all();
   const events: ReliabilityEvent[] = [
     ...payments.flatMap(({ invoiceId, at }): ReliabilityEvent[] =>
       invoiceId && visibleIds.has(invoiceId) ? [{ kind: "payment_observed", invoiceId, at }] : []),
     ...escalations.flatMap(({ invoiceId, at }): ReliabilityEvent[] =>
       visibleIds.has(invoiceId) ? [{ kind: "discount_escalation", invoiceId, at }] : []),
+    ...replacements.flatMap(({ invoiceId, at }): ReliabilityEvent[] =>
+      invoiceId && visibleIds.has(invoiceId) ? [{ kind: "superseded", invoiceId, at }] : []),
   ];
   return computeReliability(
     visibleClients,

@@ -49,21 +49,32 @@ export function computeReliability(
   const clientIds = new Set(clients.map((client) => client.id));
   const installmentIds = new Set(installments.map((invoice) => invoice.id));
   const obligations = [...invoices.filter((invoice) => !installmentIds.has(invoice.id)), ...installments]
-    .filter((invoice) => clientIds.has(invoice.clientId) && (invoice.status === "PAID" || OPEN.has(invoice.status)))
+    .filter((invoice) => clientIds.has(invoice.clientId) && (invoice.status === "PAID" || invoice.status === "SUPERSEDED" || OPEN.has(invoice.status)))
     .map((invoice) => {
       const due = utcDay(invoice.dueAt);
       const settled = invoice.status === "PAID";
-      const remaining = settled ? 0 : Math.max(0, invoice.amountCents - invoice.paidCents);
+      // An original replaced by an installment plan owes nothing itself, but how late it already was
+      // when the plan was agreed still counts; otherwise agreeing a plan would wipe out the lateness.
+      const superseded = invoice.status === "SUPERSEDED";
+      const remaining = settled || superseded ? 0 : Math.max(0, invoice.amountCents - invoice.paidCents);
       const overdue = remaining > 0 && due < today;
       const evidence = eventsByInvoice.get(invoice.id) ?? [];
-      const observed = evidence.reduce((latest, event) => {
+      const latest = (kind: ReliabilityEvent["kind"]) => evidence.reduce((found, event) => {
         const at = Date.parse(event.at);
-        return event.kind === "payment_observed" && at <= now.getTime() ? Math.max(latest, at) : latest;
+        return event.kind === kind && at <= now.getTime() ? Math.max(found, at) : found;
       }, -Infinity);
+      const observed = latest("payment_observed");
+      // The first issuance counts; later idempotent reruns are also recorded as successes.
+      const replacedAt = evidence.reduce((found, event) => {
+        const at = Date.parse(event.at);
+        return event.kind === "superseded" && at <= now.getTime() ? Math.min(found, at) : found;
+      }, Infinity);
       const lateDays = settled && Number.isFinite(observed) && Number.isFinite(due)
         ? Math.max(0, utcDay(new Date(observed)) - due)
-        : overdue ? today - due : null;
-      return { invoice, settled, remaining, overdue, due, lateDays };
+        : superseded
+          ? Number.isFinite(replacedAt) ? Math.max(0, utcDay(new Date(replacedAt)) - due) : null
+          : overdue ? today - due : null;
+      return { invoice, settled: settled || superseded, remaining, overdue, due, lateDays };
     });
   const totalOverdue = obligations.reduce((sum, row) => sum + (row.overdue ? row.remaining : 0), 0);
   const byClient = groupBy(obligations, (row) => row.invoice.clientId);

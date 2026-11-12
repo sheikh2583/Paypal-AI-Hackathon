@@ -118,7 +118,7 @@ export interface AuditEntry {
 
 export type ReliabilityClient = Pick<ClientRow, 'id' | 'name'>;
 export type ReliabilityInvoice = Pick<InvoiceRow, 'id' | 'clientId' | 'dueAt' | 'amountCents' | 'paidCents' | 'status'>;
-export type ReliabilityEvent = { invoiceId: string; at: string; kind: 'payment_observed' | 'discount_escalation' };
+export type ReliabilityEvent = { invoiceId: string; at: string; kind: 'payment_observed' | 'discount_escalation' | 'superseded' };
 export type ReliabilityComponent = 'timeliness' | 'planAdherence' | 'behaviour' | 'exposure';
 export interface ClientReliability {
   client: ReliabilityClient;

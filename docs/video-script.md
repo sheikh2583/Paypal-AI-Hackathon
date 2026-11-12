@@ -2,7 +2,7 @@
 
 Record the [hosted Chaser demo](https://paypal-ai-hackathon-9tkr.onrender.com) in **PayPal Sandbox**. Open it a minute before recording so Render Free can wake, and open **Demo tools** in the Start here panel and click **Reset demo** once before you start. Do it once more after recording; resets have a 10-second cooldown.
 
-Every shot below was checked on Nov 12, 2026; recheck the labels on the hosted site once before recording. Dana’s and Priya’s replies are scripted so the walkthrough is repeatable. Don’t claim owner emails or scheduled Autopilot sweeps in the video: the hosted demo has neither configured.
+Every shot below was checked on Nov 12, 2026; recheck the labels on the hosted site once before recording. Dana’s and Priya’s replies are scripted so the walkthrough is repeatable. You can say Chaser emails Maya when a decision is needed: the Approvals card shows “Chaser emailed you about this decision” and the audit log records it. Don’t claim scheduled Autopilot sweeps: the hosted demo has no schedule configured.
 
 ## Timed script
 

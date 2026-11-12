@@ -239,7 +239,7 @@ Error shape for all routes: `{ error: { code: string, message: string } }` with 
 
 ## Client reliability read model
 
-`/clients` and the invoice badge share the server-side `ClientReliability` view. Inputs are the client ID and name, invoice or installment ID, client ID, due date, status and integer cents, and linked `payment_observed` or `discount_escalation` events. Results include score, grade, rank, outstanding cents, average days late and a named four-component breakdown with points, weight and explanation. Null score, grade and rank denote an unranked client. A null component means that its input is unavailable. The view exposes no new API and uses the same workspace access gate as the other owner pages. See D64 for the calculation.
+`/clients` and the invoice badge share the server-side `ClientReliability` view. Inputs are the client ID and name, invoice or installment ID, client ID, due date, status and integer cents, and linked `payment_observed`, `discount_escalation` or `superseded` events (`superseded` marks when an installment plan replaced an invoice, so its lateness up to that day still counts; see D74). Results include score, grade, rank, outstanding cents, average days late and a named four-component breakdown with points, weight and explanation. Null score, grade and rank denote an unranked client. A null component means that its input is unavailable. The view exposes no new API and uses the same workspace access gate as the other owner pages. See D64 for the calculation.
 
 ## Autopilot and free-text replies
 

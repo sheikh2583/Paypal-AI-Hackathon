@@ -84,6 +84,30 @@ describe("client reliability", () => {
     expect(computeReliability(clients, rows, [], [event, event], later)).toEqual(first);
   });
 
+  it("keeps a replaced invoice's lateness when an installment plan takes over", () => {
+    // Both clients were 6 days late when their plan was agreed; "a" then paid the first installment on time.
+    const originals = [
+      invoice("a-original", "a", { status: "SUPERSEDED", dueAt: "2026-11-01" }),
+      invoice("b-original", "b", { status: "SUPERSEDED", dueAt: "2026-11-01" }),
+    ];
+    const events: ReliabilityEvent[] = [
+      { kind: "superseded", invoiceId: "a-original", at: "2026-11-07T09:00:00Z" },
+      { kind: "superseded", invoiceId: "a-original", at: "2026-11-10T09:00:00Z" }, // a later rerun must not add days
+      { kind: "superseded", invoiceId: "b-original", at: "2026-11-07T09:00:00Z" },
+      observed("a1", "2026-11-08T09:00:00Z"),
+    ];
+    const results = computeReliability(clients, originals, [
+      paid("a1", "a", { dueAt: "2026-11-09" }),
+      invoice("b1", "b", { dueAt: "2026-12-01" }),
+    ], events, now);
+    const a = results.find(({ client }) => client.id === "a")!;
+    const b = results.find(({ client }) => client.id === "b")!;
+    expect(a).toMatchObject({ avgDaysLate: 6, outstandingCents: 0 });
+    expect(a.score).toBeLessThan(100);
+    expect(b).toMatchObject({ rank: 2, avgDaysLate: 6, breakdown: { timeliness: { points: expect.any(Number) } } });
+    expect(a.rank).toBe(1);
+  });
+
   it("has no runtime module imports", () => {
     const source = ts.createSourceFile("reliability.ts",
       readFileSync(new URL("./reliability.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
