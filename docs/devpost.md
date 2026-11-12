@@ -38,7 +38,7 @@ Live free-text replies work with a configured provider; next is a tuned model an
 
 ## Test the demo
 
-Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal.
+Open [Chaser](https://paypal-ai-hackathon-9tkr.onrender.com). No Chaser login is required. Allow about a minute for Render Free to wake. The hosted demo uses fictional data and PayPal Sandbox test money. Local `pnpm dev` without keys uses mock PayPal. The hosted demo skips sign-in so you can look around; the owner sign-in a real workspace uses (password, a one-time code emailed to the owner, email verification and password reset) is shown read-only from **See the owner sign-in** in the sidebar.
 
 1. Start on the dashboard. The **Start here** panel explains the demo and offers two stories. A reset workspace shows **Outstanding $5,500.00** and **5 open invoices**, with the **PayPal Sandbox** badge in the sidebar.
 2. Click **Start Dana’s story**. On Dana’s page, click **Start with a reminder**.

@@ -6,7 +6,14 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CircleDollarSign, LoaderCircle, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm({ authConfigured, ownerAccountExists, testingSender, emailVerified }: { authConfigured: boolean; ownerAccountExists: boolean; testingSender: boolean; emailVerified: boolean }) {
+export function LoginForm({ authConfigured, ownerAccountExists, testingSender, emailVerified, previewOnly = false }: {
+  authConfigured: boolean;
+  ownerAccountExists: boolean;
+  testingSender: boolean;
+  emailVerified: boolean;
+  /** Public demo: show the real sign-in screen with every control disabled. */
+  previewOnly?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -102,7 +109,7 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(56,189,248,0.25),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(16,185,129,0.19),transparent_46%)]" />
         <div className="relative flex items-center gap-3"><span className="grid size-11 place-items-center rounded-2xl bg-white/10"><CircleDollarSign className="size-6 text-cyan-300" /></span><div><p className="text-lg font-semibold">Chaser</p><p className="text-xs text-slate-300">Invoice collections agent</p></div></div>
         <div className="relative max-w-xl"><p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-cyan-100"><Sparkles className="size-3.5" /> Owner workspace</p><h1 className="text-4xl font-semibold leading-tight tracking-tight xl:text-5xl">Collection work, with your guardrails in place.</h1><p className="mt-5 max-w-lg text-base leading-relaxed text-slate-300">Review what the agent did, keep every plan within policy, and verify every sign-in.</p><div className="mt-10 grid gap-3 sm:grid-cols-2"><Feature icon={ShieldCheck} title="Verified account" detail="Email must be verified before access." /><Feature icon={LockKeyhole} title="Two-step sign-in" detail="Password plus a one-time email code." /></div></div>
-        <p className="relative text-xs text-slate-400">Fictional clients · PayPal mock mode · no real payments</p>
+        <p className="relative text-xs text-slate-400">Fictional clients · PayPal test money only · no real payments</p>
       </section>
 
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
@@ -110,15 +117,22 @@ export function LoginForm({ authConfigured, ownerAccountExists, testingSender, e
           <div className="mb-8 lg:hidden"><span className="inline-flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><CircleDollarSign className="size-6" /></span><p className="mt-3 text-lg font-semibold">Chaser</p></div>
           <div className="mb-8"><p className="text-sm font-medium text-primary">Owner workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">{step === "otp" ? "Check your email" : "Sign in securely"}</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step === "otp" ? `Enter the one-time code sent to ${email}.` : "Use your owner account to review invoices, approvals, and agent activity."}</p></div>
 
+          {previewOnly ? <div role="note" className="mb-5 rounded-xl border border-primary/25 bg-accent/60 p-4 text-sm leading-relaxed text-accent-foreground">
+            <p className="font-semibold">Preview: sign-in is turned off in the public demo</p>
+            <p className="mt-1">So you can look around without an account, this demo skips sign-in. A real Chaser workspace sits behind this screen: the owner&apos;s password, then a one-time code emailed to the owner, with email verification and password reset. Only one owner account can exist.</p>
+            <Link href="/" className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary hover:underline">Back to the demo <ArrowRight className="size-4" aria-hidden="true" /></Link>
+          </div> : null}
           {!authConfigured ? <div role="status" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">Authentication is not enabled yet. Set `AUTH_OWNER_EMAIL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM` in the server environment.</div> : null}
           {testingSender ? <div role="note" className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-950">Resend is using its testing sender. Email delivery is restricted to the eligible Resend test recipient; arbitrary-user delivery is not enabled.</div> : null}
           {emailVerified ? <p role="status" className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">Email verified. Sign in with your password to continue.</p> : null}
           {step === "password" && !ownerAccountExists && authConfigured ? <div className="mb-5 rounded-xl border bg-secondary/50 p-4 text-sm text-muted-foreground">No owner account exists yet. <Link href="/setup" className="font-semibold text-primary hover:underline">Set up the owner account</Link>.</div> : null}
 
-          {step === "password" ? <form onSubmit={(event) => void signIn(event)} className="space-y-4">
+          {step === "password" ? <form onSubmit={(event) => { if (previewOnly) { event.preventDefault(); return; } void signIn(event); }} className="space-y-4">
+            <fieldset disabled={previewOnly} className="space-y-4 disabled:opacity-70">
             <div><label htmlFor="email" className="mb-1.5 block text-sm font-medium">Owner email</label><input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="you@example.com" /></div>
-            <div><div className="mb-1.5 flex items-center justify-between gap-3"><label htmlFor="password" className="text-sm font-medium">Password</label><Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot password?</Link></div><input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="Enter your password" /></div>
-            <button type="submit" disabled={busy || !authConfigured || !ownerAccountExists} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <LockKeyhole className="size-4" />}{busy ? "Verifying…" : "Continue with password"}</button>
+            <div><div className="mb-1.5 flex items-center justify-between gap-3"><label htmlFor="password" className="text-sm font-medium">Password</label>{previewOnly ? <span className="text-xs font-medium text-muted-foreground">Forgot password?</span> : <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot password?</Link>}</div><input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3.5 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="Enter your password" /></div>
+            <button type="submit" disabled={busy || !authConfigured || !ownerAccountExists} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <LockKeyhole className="size-4" />}{busy ? "Verifying…" : previewOnly ? "Sign-in is off in the public demo" : "Continue with password"}</button>
+            </fieldset>
           </form> : <form onSubmit={(event) => void verifyCode(event)} className="space-y-4">
             <div><label htmlFor="otp" className="mb-1.5 block text-sm font-medium">Six-digit email code</label><input id="otp" name="otp" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} className="h-12 w-full rounded-xl border bg-background px-4 text-center font-mono text-lg tracking-[0.4em] shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" placeholder="000000" /></div>
             <button type="submit" disabled={busy || code.length !== 6} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}{busy ? "Checking code…" : "Verify and continue"}</button>

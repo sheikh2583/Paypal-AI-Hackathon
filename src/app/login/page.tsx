@@ -8,8 +8,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ verified?: string }> }) {
-  // In public demo mode there is no login — go straight to the dashboard.
-  if (getAppEnv().demoPublic) redirect("/");
+  // The public demo skips sign-in, but judges can still see the owner sign-in a real workspace uses.
+  // The form is shown disabled so nobody can trigger codes or reset emails to the owner's inbox.
+  if (getAppEnv().demoPublic) return <LoginForm authConfigured ownerAccountExists testingSender={false} emailVerified={false} previewOnly />;
   if (await getDemoSession()) redirect("/");
   const [ownerAccountExists] = await Promise.all([getOwnerAccountExists()]);
   const readiness = getAuthReadiness();

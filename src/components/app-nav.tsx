@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, LayoutDashboard, LoaderCircle, LogOut, ScrollText, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { Inbox, LayoutDashboard, LoaderCircle, LockKeyhole, LogOut, ScrollText, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
@@ -73,6 +73,12 @@ export function AppNav({ demoPublic }: { demoPublic: boolean }) {
           </Link>
         );
       })}
+      {demoPublic ? <div className="hidden rounded-lg border border-dashed px-3 py-2.5 text-xs leading-relaxed text-muted-foreground md:mt-4 md:block">
+        <p className="flex items-center gap-1.5 font-semibold text-foreground"><LockKeyhole className="size-3.5" aria-hidden="true" /> Public demo</p>
+        <p className="mt-1">No sign-in here, so there is nothing to sign out of. A real workspace is owner-only.</p>
+        <Link href="/login" className="mt-1.5 inline-block font-semibold text-primary hover:underline">See the owner sign-in</Link>
+      </div> : null}
+      {demoPublic ? <Link href="/login" className="flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground md:hidden"><LockKeyhole className="size-4" aria-hidden="true" /> Owner sign-in</Link> : null}
       {!demoPublic ? <button type="button" onClick={() => void signOut()} disabled={busy} className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60 md:mt-4 md:border-t md:pt-5">
         {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" aria-hidden="true" />}
         {busy ? "Signing out…" : "Sign out"}
