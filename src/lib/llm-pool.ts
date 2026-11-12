@@ -43,6 +43,13 @@ export class KeyPool {
     return (this.cooldownUntil.get(comboId(combo)) ?? 0) <= this.now();
   }
 
+  /** Milliseconds until a cooling combination is usable; null if it is disabled, excluded or not cooling. */
+  coolingFor(combo: PoolCombo): number | null {
+    if (this.disabledKeys.has(combo.keyIndex) || this.excluded.has(comboId(combo))) return null;
+    const remaining = (this.cooldownUntil.get(comboId(combo)) ?? 0) - this.now();
+    return remaining > 0 ? remaining : null;
+  }
+
   /** When the combination becomes usable again, or 0 if it already is. */
   readyAt(combo: PoolCombo): number {
     return Math.max(0, (this.cooldownUntil.get(comboId(combo)) ?? 0));

@@ -137,6 +137,40 @@ describe('OpenAICompatibleLLM key pool', () => {
   });
 });
 
+describe('a pool of one key', () => {
+  it('retries a 503 once after a short pause and keeps the key usable for the rest of the run', async () => {
+    const statuses = [503, 200, 200];
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      const status = statuses.shift() ?? 200;
+      if (status !== 200) return new Response('overloaded', { status });
+      return statuses.length === 1
+        ? ok({ content: null, tool_calls: [{ id: 't1', type: 'function', function: { name: 'lookup', arguments: '{}' } }] })
+        : ok({ content: 'done' });
+    }));
+    const llm = new OpenAICompatibleLLM(url, KEYS[0], 'model-a', { pool: quietPool(1, ['model-a']) });
+    const result = await llm.runToolLoop({ system: 's', messages: [{ role: 'user', content: 'go' }], tools: [{ name: 'lookup', description: 'd', inputSchema: { type: 'object' } }], maxIterations: 3, onToolCall: async () => '{}' });
+    expect(result.summary).toBe('done');
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not lock the only key for 30 s after a server error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('overloaded', { status: 503 })));
+    const llm = new OpenAICompatibleLLM(url, KEYS[0], 'model-a', { pool: quietPool(1, ['model-a']) });
+    await expect(structuredCall(llm)).rejects.toThrow('LLM_HTTP_503');
+    vi.stubGlobal('fetch', vi.fn(async () => ok({ content: '{"ok":true}' })));
+    await expect(structuredCall(llm)).resolves.toEqual({ ok: true }); // the next request still reaches the provider
+  });
+
+  it('waits out a short per-minute limit instead of failing at once', async () => {
+    const limited = () => new Response(JSON.stringify({ error: { details: [{ retryDelay: '0.2s' }] } }), { status: 429 });
+    const responses = [limited, () => ok({ content: '{"ok":true}' })];
+    vi.stubGlobal('fetch', vi.fn(async () => (responses.shift() ?? (() => ok({ content: '{"ok":true}' })))()));
+    const llm = new OpenAICompatibleLLM(url, KEYS[0], 'model-a', { pool: quietPool(1, ['model-a']) });
+    await expect(structuredCall(llm)).resolves.toEqual({ ok: true });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('pool helpers', () => {
   it('reads Gemini retry hints and daily quotas', async () => {
     expect(parseRateLimit(await perMinute429().text(), new Headers())).toEqual({ perDay: false, retryAfterMs: 23_000 });

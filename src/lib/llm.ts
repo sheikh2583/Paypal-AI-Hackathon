@@ -76,7 +76,7 @@ type Attempt =
   | { ok: false; kind: 'fatal'; error: LlmRequestError };
 
 /** Failed key + model combinations for one agent run or one structured call; each is tried at most once. */
-interface PoolRun { failed: Set<string>; waited: boolean }
+interface PoolRun { failed: Set<string> }
 
 /** Plain-fetch OpenAI Chat Completions adapter over a pool of keys. Provider errors never include response bodies. */
 export class OpenAICompatibleLLM implements LLM {
@@ -141,13 +141,24 @@ export class OpenAICompatibleLLM implements LLM {
    * request never ran, so retrying it elsewhere is safe even after a side-effecting tool (D75).
    */
   private async request(body: Record<string, unknown>, run: PoolRun, outerSignal?: AbortSignal, onCall?: (record: ProviderCallRecord) => void): Promise<Record<string, unknown>> {
+    // A single key has nowhere else to go, so it keeps the earlier single-key behaviour (D70): a short pause and
+    // one more try after a 503 or a short rate limit, and no 30 s cooldown that would fail the next requests at once.
+    const single = this.keys.length === 1;
+    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
     let last: LlmRequestError | undefined;
-    let shortestRateLimit: { combo: PoolCombo; waitMs: number } | undefined;
+    let retry: { combo: PoolCombo; waitMs: number } | undefined;
+    let waited = false;
     for (const keyIndex of this.pool.nextKeyOrder()) {
       for (const model of this.models) {
         const combo = { keyIndex, model };
         const id = `${keyIndex}|${model}`;
-        if (run.failed.has(id) || !this.pool.isUsable(combo)) continue;
+        if (run.failed.has(id)) continue;
+        if (!this.pool.isUsable(combo)) {
+          const cooling = this.pool.coolingFor(combo);
+          if (!single || waited || cooling === null || cooling > MAX_RATE_LIMIT_WAIT_MS) continue;
+          waited = true;
+          await pause(cooling);
+        }
         if (outerSignal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
         const outcome = await this.attempt(combo, body, outerSignal, onCall);
         if (outcome.ok) return outcome.data;
@@ -155,22 +166,28 @@ export class OpenAICompatibleLLM implements LLM {
         last = outcome.error;
         if (outcome.kind === 'fatal') throw outcome.error;
         if (outcome.kind === 'auth') { this.pool.disableKey(keyIndex, outcome.error.status ?? 0); break; }
-        if (outcome.kind === 'transient') { this.pool.coolDownKey(keyIndex); break; }
+        if (outcome.kind === 'transient') {
+          if (single) retry ??= { combo, waitMs: 350 };
+          else this.pool.coolDownKey(keyIndex);
+          break;
+        }
         this.pool.coolDown(combo, outcome.untilMs);
-        if (!outcome.perDay) {
+        if (single && !outcome.perDay) {
           const waitMs = outcome.retryAfterMs ?? 350;
-          if (!shortestRateLimit || waitMs < shortestRateLimit.waitMs) shortestRateLimit = { combo, waitMs };
+          if (!retry || waitMs < retry.waitMs) retry = { combo, waitMs };
         }
       }
     }
-    // A pool of one key keeps the earlier single-key behaviour (D70): wait out a short per-minute limit once.
-    if (this.keys.length === 1 && !run.waited && shortestRateLimit && shortestRateLimit.waitMs <= MAX_RATE_LIMIT_WAIT_MS) {
-      run.waited = true;
-      await new Promise((resolve) => setTimeout(resolve, shortestRateLimit.waitMs));
-      const outcome = await this.attempt(shortestRateLimit.combo, body, outerSignal, onCall);
-      if (outcome.ok) return outcome.data;
+    if (single && !waited && retry && retry.waitMs <= MAX_RATE_LIMIT_WAIT_MS) {
+      waited = true;
+      await pause(retry.waitMs);
+      if (outerSignal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
+      const outcome = await this.attempt(retry.combo, body, outerSignal, onCall);
+      // A key that answers on the retry is healthy again for the rest of the run.
+      if (outcome.ok) { run.failed.delete(`${retry.combo.keyIndex}|${retry.combo.model}`); return outcome.data; }
       last = outcome.error;
-      if (outcome.kind === 'rate') this.pool.coolDown(shortestRateLimit.combo, outcome.untilMs);
+      if (outcome.kind === 'rate') this.pool.coolDown(retry.combo, outcome.untilMs);
+      if (outcome.kind === 'auth') this.pool.disableKey(retry.combo.keyIndex, outcome.error.status ?? 0);
     }
     throw last ?? new LlmRequestError('LLM_POOL_EXHAUSTED', 429);
   }
@@ -180,7 +197,7 @@ export class OpenAICompatibleLLM implements LLM {
     const messages: LlmMessage[] = [{ role: 'system', content: opts.system }, ...opts.messages.slice(-getLlmEnv().maxHistory)];
     const tools = opts.tools.map((tool) => ({ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } }));
     const toolCalls: ToolCallRecord[] = [];
-    const run: PoolRun = { failed: new Set(), waited: false };
+    const run: PoolRun = { failed: new Set() };
     for (let iteration = 0; iteration < opts.maxIterations; iteration++) {
       if (opts.signal?.aborted) throw new LlmRequestError('LLM_TIMEOUT');
       const data = await this.request({ messages, tools, ...(opts.toolChoiceName ? { tool_choice: { type: 'function', function: { name: opts.toolChoiceName } } } : {}) }, run, opts.signal, opts.onProviderCall);
@@ -214,7 +231,7 @@ export class OpenAICompatibleLLM implements LLM {
         const data = await this.request({
           messages: [{ role: 'system', content: `${opts.system}\nReturn only JSON matching this schema: ${JSON.stringify(zodJsonSchema(opts.schema))}` }, { role: 'user', content: opts.input }],
           response_format: { type: 'json_object' },
-        }, { failed: new Set(), waited: false }, undefined, opts.onProviderCall);
+        }, { failed: new Set() }, undefined, opts.onProviderCall);
         const choices = data.choices as Array<{ message?: { content?: string | null } }> | undefined;
         return opts.schema.parse(JSON.parse(choices?.[0]?.message?.content ?? ''));
       } catch (error) {
