@@ -223,6 +223,15 @@ describe('agent runs', () => {
     expect(JSON.parse(seen.content ?? '{}')).toMatchObject({ acceptedPlanId: expect.any(String) });
   });
 
+  it('tells the model today’s date from the demo clock, so plan due dates are not guessed', async () => {
+    await seeded();
+    const { handleToolCall } = await import('./tools');
+    const later = new Date('2026-11-20T09:00:00.000Z');
+    const context = JSON.parse(await handleToolCall('get_invoice_context', { invoiceId: 'invoice-dana-900' }, database, later)) as { today: string };
+    expect(context.today).toBe('2026-11-20');
+    expect(buildSystemPrompt({ minDepositPercent: 30, maxInstallments: 3, maxPlanDays: 90, maxDiscountPercent: 5, tone: 'friendly' }, 'Maya', 'Studio', 'friendly')).toContain('on or after "today"');
+  });
+
   it('hands the model the real pay links, accepts a confirmation that quotes one, and reports the plan as active even at the cap', async () => {
     await seeded();
     const paypal = new MockPayPalClient(database);

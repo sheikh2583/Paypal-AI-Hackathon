@@ -51,6 +51,7 @@ How you work:
 
 ```json
 {
+  "today": "2026-11-13",
   "invoice": {"id":"…","number":"…","description":"…","amountCents":90000,"paidCents":0,"dueAt":"…","daysOverdue":23,"status":"OVERDUE","chaseState":"NEW","paypalInvoiceUrl":"…"},
   "client": {"name":"…","lateCount":1,"avgDaysLate":6,"responsiveness":"high"},
   "risk": {"score":42,"factors":[{"factor":"23 days overdue","impact":20}]},
@@ -59,7 +60,7 @@ How you work:
 }
 ```
 
-(The policy numbers are returned so the agent can propose compliant plans without trial and error; the `propose_payment_plan` tool still enforces them.)
+(`today` is the demo clock's date, so plan due dates are never guessed. The policy numbers are returned so the agent can propose compliant plans without trial and error; the `propose_payment_plan` tool still enforces them.)
 
 ## Client reply classifier
 

@@ -200,7 +200,7 @@ Each tool: Zod-validated input → policy where needed → effect → audit → 
 
 | tool | input | effect |
 |---|---|---|
-| `get_invoice_context` | `{invoiceId}` | read-only: invoice, client history, risk, last 20 messages, policy summary |
+| `get_invoice_context` | `{invoiceId}` | read-only: today's date (demo clock), invoice, client history, risk, last 20 messages, policy summary |
 | `send_message` | `{invoiceId, body}` | Stores a nonblank `agent_to_client` message up to 900 characters. Only the recipient URLs of this invoice and its plan are allowed. Known coercive phrases and disclosures of internal instructions or limits are rejected and audited. |
 | `propose_payment_plan` | `{invoiceId, discountPercent, installments[]}` | policy check. Allowed and under the auto-approve threshold: creates plan `OFFERED`. Allowed but `needsOwnerApproval`: creates plan `PENDING_APPROVAL` + approval `PLAN_NEEDS_SIGNOFF`, sets `chase_state=ESCALATED`; the client sees no terms until the owner approves. Denied: returns violations, creates nothing |
 | `create_plan_invoices` | `{planId}` | only if plan `ACCEPTED`; `rebasePlan` + policy re-check; creates and sends all installment invoices (cancels any already created if one fails), then cancels the original in PayPal and marks it `SUPERSEDED`; plan `ACTIVE`, `chase_state=PLAN_ACTIVE`; idempotent |

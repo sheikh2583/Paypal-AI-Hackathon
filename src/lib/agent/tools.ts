@@ -268,6 +268,8 @@ async function handleGetInvoiceContext(
   const overdue = daysOverdue(invoice.dueAt, now);
 
   const context = {
+    // The demo clock can be pinned or moved, so the model must not guess the date; plan due dates are checked against it.
+    today: now.toISOString().slice(0, 10),
     invoice: {
       id: invoice.id,
       number: invoice.number,
