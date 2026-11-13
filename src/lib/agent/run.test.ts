@@ -223,6 +223,37 @@ describe('agent runs', () => {
     expect(JSON.parse(seen.content ?? '{}')).toMatchObject({ acceptedPlanId: expect.any(String) });
   });
 
+  it('reports a plan offer as PLAN_OFFERED even when the model books a follow-up afterwards', async () => {
+    await seeded();
+    const offering: LLM = {
+      async structured<T>() { return {} as T; },
+      async runToolLoop() {
+        const at = DEMO_NOW.toISOString();
+        return { summary: 'Offered a plan.', toolCalls: [
+          { tool: 'propose_payment_plan', input: {}, ok: true, result: { ok: true, planId: 'p1', planStatus: 'OFFERED' }, at },
+          { tool: 'send_message', input: {}, ok: true, result: { ok: true, messageId: 'm1' }, at },
+          { tool: 'schedule_followup', input: {}, ok: true, result: { ok: true, nextFollowupAt: at }, at },
+        ] };
+      },
+    };
+    expect((await runAgent('invoice-dana-900', 'manual', { database, llm: offering })).finalState).toBe('PLAN_OFFERED');
+  });
+
+  it('reports an escalation as ESCALATED even when Chaser messages the client afterwards', async () => {
+    await seeded();
+    const escalating: LLM = {
+      async structured<T>() { return {} as T; },
+      async runToolLoop() {
+        const at = DEMO_NOW.toISOString();
+        return { summary: 'Escalated.', toolCalls: [
+          { tool: 'escalate_to_owner', input: {}, ok: true, result: { ok: true, approvalId: 'a1' }, at },
+          { tool: 'send_message', input: {}, ok: true, result: { ok: true, messageId: 'm1' }, at },
+        ] };
+      },
+    };
+    expect((await runAgent('invoice-priya-600', 'manual', { database, llm: escalating })).finalState).toBe('ESCALATED');
+  });
+
   it('tells the model today’s date from the demo clock, so plan due dates are not guessed', async () => {
     await seeded();
     const { handleToolCall } = await import('./tools');

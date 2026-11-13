@@ -200,10 +200,18 @@ function oneSentence(text: string, outcome: RunOutcome): string {
 
 function outcomeFor(toolCalls: ToolCallRecord[]): RunOutcome {
   const last = lastOutcome(toolCalls);
-  // Issuing the installments is the run's real result; a confirmation or follow-up after it does not change that.
-  const issued = toolCalls.some((call) => call.tool === 'create_plan_invoices' && call.ok
-    && typeof call.result === 'object' && call.result !== null && (call.result as Record<string, unknown>).ok === true);
-  return issued && (last === 'WAITING' || last === 'NUDGED') ? 'PLAN_ACTIVE' : last;
+  const succeeded = (tool: string) => toolCalls.some((call) => call.tool === tool && call.ok
+    && typeof call.result === 'object' && call.result !== null && (call.result as Record<string, unknown>).ok === true
+    && (call.result as Record<string, unknown>).needsOwnerApproval !== true);
+  // A decision handed to the owner outranks the note Chaser sends the client afterwards.
+  const escalated = toolCalls.some((call) => call.ok && typeof call.result === 'object' && call.result !== null
+    && (call.tool === 'escalate_to_owner' ? (call.result as Record<string, unknown>).ok === true
+      : (call.result as Record<string, unknown>).needsOwnerApproval === true || (call.result as Record<string, unknown>).escalated === true));
+  if (escalated && (last === 'WAITING' || last === 'NUDGED')) return 'ESCALATED';
+  // Issuing the installments (or offering a plan) is the run's real result; a confirmation or follow-up after it does not change that.
+  if (last !== 'WAITING' && last !== 'NUDGED') return last;
+  if (succeeded('create_plan_invoices')) return 'PLAN_ACTIVE';
+  return succeeded('propose_payment_plan') ? 'PLAN_OFFERED' : last;
 }
 
 function lastOutcome(toolCalls: ToolCallRecord[]): RunOutcome {
