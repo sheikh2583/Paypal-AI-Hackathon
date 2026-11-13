@@ -5,6 +5,7 @@ import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import LibSqlite from "libsql";
 import { getDatabaseEnv } from "../env";
 import { schema } from "./schema";
+import { ReconnectingConnection, type SyncConnection } from "./reconnecting";
 
 export type AppDb = BetterSQLite3Database<typeof schema> & {
   $client: InstanceType<typeof BetterSqlite3>;
@@ -32,7 +33,11 @@ function getSingleton(): AppDb {
       const options = { authToken: settings.authToken, timeout: 5_000 };
       // The native libSQL driver implements the synchronous better-sqlite3 API
       // used by Drizzle, Better Auth, and the existing payment transactions.
-      const sqlite = new LibSqlite(settings.url, options);
+      // The wrapper replaces the connection when Turso drops its stream (D82).
+      const sqlite = new ReconnectingConnection(
+        () => new LibSqlite(settings.url, options) as unknown as SyncConnection,
+        () => console.warn("Turso stream was lost; opened a new database connection."),
+      );
       singleton = drizzle(sqlite as unknown as BetterSqlite3.Database, { schema });
     }
   }
