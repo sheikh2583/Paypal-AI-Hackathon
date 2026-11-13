@@ -66,4 +66,20 @@ describe("account changes through the auth API", () => {
     expect((await post("/request-password-reset", { email: DEMO_CLIENT_ACCOUNTS[0].email })).status).toBe(403);
     expect((await post("/request-password-reset", { email: "owner@example.test" })).status).toBe(200);
   });
+
+  it("on the public demo, refuses owner sign-in and every email-sending endpoint but still lets clients sign in", async () => {
+    const saved = process.env.DEMO_PUBLIC;
+    process.env.DEMO_PUBLIC = "1";
+    try {
+      expect((await post("/sign-in/email", { email: " Owner@Example.test ", password: "x" })).status).toBe(403);
+      for (const path of ["/request-password-reset", "/reset-password", "/send-verification-email", "/sign-up/email", "/two-factor/send-otp"]) {
+        expect((await post(path, { email: "owner@example.test" })).status).toBe(403);
+      }
+      expect(state.forwarded).toEqual([]);
+      expect((await post("/sign-in/email", { email: DEMO_CLIENT_ACCOUNTS[0].email, password: "x" })).status).toBe(200);
+      expect(state.forwarded).toEqual(["/api/auth/sign-in/email"]);
+    } finally {
+      if (saved === undefined) delete process.env.DEMO_PUBLIC; else process.env.DEMO_PUBLIC = saved;
+    }
+  });
 });

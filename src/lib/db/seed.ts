@@ -347,7 +347,7 @@ async function refreshSeededInvoices(
   { allInvoices, now }: ReturnType<typeof insertSeedRows>,
 ): Promise<SeededInvoiceSummary[]> {
   for (const invoice of allInvoices) {
-    await refreshRisk(invoice.id, database, now);
+    await refreshRisk(invoice.id, database, now, { explain: 'template' });
   }
 
   return overdueInvoiceSeed.map((invoice) => {

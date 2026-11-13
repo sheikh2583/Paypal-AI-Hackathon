@@ -119,7 +119,7 @@ export async function advanceDemoTime(days: number, database: AppDb = db) {
     }
     return { now, open, overdueUpdated };
   })();
-  for (const invoice of open) await refreshRisk(invoice.id, database, now);
+  for (const invoice of open) await refreshRisk(invoice.id, database, now, { explain: 'template' });
   const result = { now: now.toISOString(), overdueUpdated, refreshed: open.length };
   audit({ actor: "owner", action: "demo.advance_time", input: { days }, result, ok: true }, database, result.now);
   emit({ type: "invoice.updated", at: result.now });

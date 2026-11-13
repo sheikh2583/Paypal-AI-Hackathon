@@ -58,14 +58,18 @@ export function templateExplanation(result: RiskResult): string {
   return `Risk ${result.score} of 100, ${parts.join(', ')}.`;
 }
 
-export async function refreshRisk(invoiceId: string, database: AppDb = db, at = getNow()): Promise<RiskResult> {
+/**
+ * `explain: 'template'` skips the model. Bulk refreshes (seeding, moving demo time, PayPal reconciles on page
+ * loads) use it so they don't spend the free-tier request budget the guided stories need (D84).
+ */
+export async function refreshRisk(invoiceId: string, database: AppDb = db, at = getNow(), options: { explain?: 'model' | 'template' } = {}): Promise<RiskResult> {
   const invoice = getInvoice(invoiceId, database);
   if (!invoice) throw new Error('INVOICE_NOT_FOUND');
   const result = computeRisk(riskFeaturesForInvoice(invoice, database, at));
   let explanation = invoice.riskExplanation;
   if (explanation === null || invoice.riskScore === null || Math.abs(result.score - invoice.riskScore) >= 5) {
     explanation = templateExplanation(result);
-    if (getLlmEnv().mode === 'live') {
+    if (getLlmEnv().mode === 'live' && options.explain !== 'template') {
       try {
         const structured = await getLLM().structured({
           system: 'Explain to a busy freelancer, in one short plain-English sentence, why this overdue invoice has this risk score out of 100 (higher means less likely to be paid). Name the one or two biggest reasons in everyday words. Use only the provided factors and do not infer extra facts. Do not use the words deterministic, factor, base score, impact or algorithm.',

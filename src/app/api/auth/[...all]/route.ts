@@ -1,7 +1,7 @@
 import { toNextJsHandler } from "better-auth/next-js";
 import { auth, authNotConfiguredResponse, ensureAuthSchema, getAuthReadiness, getOwnerAccountExists } from "@/lib/auth";
 import { db } from "@/lib/db/client";
-import { getAuthEnv } from "@/lib/env";
+import { getAppEnv, getAuthEnv } from "@/lib/env";
 import { consumeEmailVerificationToken, resetPasswordIdentifier } from "@/lib/auth-tokens";
 import { isDemoClientEmail } from "@/lib/demo-accounts";
 
@@ -13,6 +13,14 @@ const CLIENT_LOCKED_ENDPOINTS = new Set([
   "/link-social", "/unlink-account",
   "/two-factor/enable", "/two-factor/disable", "/two-factor/generate-backup-codes",
 ]);
+
+// The public demo leaves the owner workspace open, so owner sign-in is shown read-only there (D76).
+// These are refused on the server too, so no visitor can send codes or reset emails to the owner's inbox (D83).
+const PUBLIC_DEMO_CLOSED_ENDPOINTS = new Set(["/request-password-reset", "/reset-password", "/send-verification-email", "/sign-up/email", "/two-factor/send-otp"]);
+
+function publicDemoRefusal(): Response {
+  return Response.json({ error: { code: "OWNER_SIGN_IN_OFF", message: "Owner sign-in and password reset are switched off in this public demo." } }, { status: 403 });
+}
 
 export async function GET(request: Request): Promise<Response> {
   await ensureAuthSchema();
@@ -31,6 +39,15 @@ export async function POST(request: Request): Promise<Response> {
   if (!getAuthReadiness().ready) return authNotConfiguredResponse();
 
   const url = new URL(request.url);
+  if (getAppEnv().demoPublic) {
+    const endpoint = url.pathname.replace(/^\/api\/auth/, "");
+    if (PUBLIC_DEMO_CLOSED_ENDPOINTS.has(endpoint)) return publicDemoRefusal();
+    if (endpoint === "/sign-in/email") {
+      // Clients still sign in to their portal; only the owner's account is closed here.
+      const body = await request.clone().json().catch(() => null) as { email?: unknown } | null;
+      if (typeof body?.email === "string" && body.email.trim().toLowerCase() === getAuthEnv().ownerEmail) return publicDemoRefusal();
+    }
+  }
   // Client accounts, including the published demo one, are managed by the owner (D77, D78).
   // Blocking these stops one visitor from changing the demo password or ending other visitors' sessions.
   if (CLIENT_LOCKED_ENDPOINTS.has(url.pathname.replace(/^\/api\/auth/, ""))) {

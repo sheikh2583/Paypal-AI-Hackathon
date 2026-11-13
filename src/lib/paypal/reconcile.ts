@@ -109,7 +109,7 @@ export async function reconcilePayPalInvoice(
     const events = database.$client.transaction(() => applySnapshot(paypalInvoiceId, remote, database, now.toISOString()))();
     if (events.some((event) => event.type === "invoice.updated" && event.invoiceId === invoice.id)) {
       try {
-        await refreshRisk(invoice.id, database, now);
+        await refreshRisk(invoice.id, database, now, { explain: 'template' });
       } catch {
         audit({ actor: "paypal", action: "reconcile.risk.error", invoiceId: invoice.id, ok: false }, database, now.toISOString());
       }
